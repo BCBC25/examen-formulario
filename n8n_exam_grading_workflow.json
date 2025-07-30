@@ -1,0 +1,312 @@
+{
+  "name": "Exam Auto-Grading Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "examSubmission",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "REPLACE_WITH_UUID"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "student",
+              "value": "={{$json[\"student_name\"]}}"
+            },
+            {
+              "name": "email",
+              "value": "={{$json[\"email\"]}}"
+            }
+          ],
+          "json": [
+            {
+              "name": "answers",
+              "value": "={{ Object.keys($json).filter(k => k.startsWith('answer_')).sort().map(k => $json[k]) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oauth2",
+        "operation": "read",
+        "spreadsheetId": "1XCqrvg_y46-OUZSrKe-UraS1KckndqzZDtVqXFHT6W8",
+        "sheetName": "Hoja1",
+        "rangeDefined": false
+      },
+      "name": "Get Questions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        660,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_GOOGLE_CRED_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const answers = $json.answers || Object.keys($json).filter(k => k.startsWith('answer_')).sort().map(k => $json[k]);\nconst questions = $items(\"Get Questions\", 0)[0].json;\nlet score = 0;\nlet feedback = [];\nquestions.forEach((q, idx) => {\n  if (q.tipo === 'test') {\n    const student = (answers[idx] || '').trim().toUpperCase();\n    const correct = (q.respuesta_correcta || '').trim().toUpperCase();\n    const ok = student === correct;\n    if (ok) score += Number(q.peso || 1);\n    feedback.push({ id: q.id, student, correct, ok });\n  }\n});\nreturn [{ json: { score_test: score, feedback_test: feedback } }];"
+      },
+      "name": "Grade MCQ",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        900,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "chat",
+        "model": "gpt-3.5-turbo",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Eres corrector de exámenes. Devuelve solamente un JSON como array donde cada elemento incluye id, score (0-5) y feedback."
+          },
+          {
+            "role": "user",
+            "content": "Preguntas: {{ JSON.stringify($items(\"Get Questions\", 0)[0].json.filter(q => q.tipo === 'open')) }}\nRespuestas: {{ JSON.stringify($json.answers.slice(50)) }}"
+          }
+        ],
+        "responseFormat": "json"
+      },
+      "name": "Grade Open",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 2,
+      "position": [
+        900,
+        480
+      ],
+      "credentials": {
+        "openAIApi": {
+          "id": "REPLACE_WITH_OPENAI_CRED_ID",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "passThrough",
+        "output": "input1"
+      },
+      "name": "Merge Scores",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const openData = $items(\"Grade Open\", 0)[0].json || {};\nconst testData = $items(\"Grade MCQ\", 0)[0].json || {};\nconst score_open = openData.total_score || (openData.score_open ?? 0);\nconst score_test = testData.score_test || 0;\nconst total = score_open + score_test;\nreturn [{ json: {\n  student: $items(\"Set Data\",0)[0].json.student,\n  email: $items(\"Set Data\",0)[0].json.email,\n  score_test,\n  score_open,\n  total,\n  feedback_test: testData.feedback_test,\n  feedback_open: openData.feedback_open || openData\n}}];"
+      },
+      "name": "Calculate Total",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oauth2",
+        "operation": "append",
+        "spreadsheetId": "1XCqrvg_y46-OUZSrKe-UraS1KckndqzZDtVqXFHT6W8",
+        "sheetName": "Hoja2",
+        "keyRow": false,
+        "additionalInputs": {
+          "dataToSend": "={{[$json.student,$json.email,$json.score_test,$json.score_open,$json.total, JSON.stringify($json.feedback_test), JSON.stringify($json.feedback_open)]}}"
+        }
+      },
+      "name": "Save Result",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1580,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_GOOGLE_CRED_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@yourdomain.com",
+        "toEmail": "={{$json.email}}",
+        "subject": "Tu nota del examen",
+        "html": "Hola {{$json.student}}:<br>Tu nota total es <b>{{$json.total}} / 100</b><br>Test: {{$json.score_test}}<br>Abiertas: {{$json.score_open}}<br><br>Saludos."
+      },
+      "name": "Email Student",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_SMTP_CRED_ID",
+          "name": "SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "responseData": "{\"message\": \"Respuestas recibidas. Revisa tu correo.\"}"
+      },
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Data": {
+      "main": [
+        [
+          {
+            "node": "Get Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Questions": {
+      "main": [
+        [
+          {
+            "node": "Grade MCQ",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Grade Open",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grade MCQ": {
+      "main": [
+        [
+          {
+            "node": "Merge Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grade Open": {
+      "main": [
+        [
+          {
+            "node": "Merge Scores",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Scores": {
+      "main": [
+        [
+          {
+            "node": "Calculate Total",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Total": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Result": {
+      "main": [
+        [
+          {
+            "node": "Email Student",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Student": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "versionId": "1",
+  "meta": {
+    "instanceId": "REPLACE_WITH_INSTANCE_ID"
+  },
+  "id": 1
+}
