@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Formulario Examen Dinámico</title>
+</head>
+<body>
+  <h1>Examen - 100 preguntas</h1>
+
+  <form action="https://bc1.app.n8n.cloud/webhook/30990345-795b-4cce-942c-c47860b76d17" method="POST">
+
+    <label>Nombre:<br />
+      <input type="text" name="nombre" required />
+    </label><br /><br />
+
+    <label>Email:<br />
+      <input type="email" name="email" required />
+    </label><br /><br />
+
+    <div id="preguntas">Cargando preguntas...</div>
+
+    <button type="submit">Enviar examen</button>
+  </form>
+
+  <script>
+    fetch("https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec")
+      .then(response => response.json())
+      .then(preguntas => {
+        const container = document.getElementById("preguntas");
+        container.innerHTML = "";
+
+        preguntas.forEach(p => {
+          const div = document.createElement("div");
+
+          // Suponemos que tienes una columna 'tipo' con valores "multiple" o "abierta"
+          if (p.tipo === "multiple") {
+            div.innerHTML = `
+              <p>${p.id}. ${p.pregunta}</p>
+              <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br />
+              <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br />
+              <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br />
+              <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br />
+            `;
+          } else if (p.tipo === "abierta") {
+            div.innerHTML = `
+              <p>${p.id}. ${p.pregunta}</p>
+              <textarea name="q${p.id}" rows="4" cols="60" required></textarea>
+            `;
+          }
+
+          container.appendChild(div);
+          container.appendChild(document.createElement("br"));
+        });
+      })
+      .catch(err => {
+        document.getElementById("preguntas").innerText =
+          "Error al cargar preguntas.";
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
