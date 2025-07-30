@@ -1,0 +1,283 @@
+{
+  "name": "Examen Virtual con IA - Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "examen",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-examen",
+      "name": "Webhook Examen",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "examen-webhook"
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "read",
+        "documentId": "1XCqrvg_y46-OUZSrKe-UraS1KckndqzZDtVqXFHT6W8",
+        "sheetName": "Hoja 1",
+        "range": "A:H",
+        "keyRow": 1,
+        "dataStartRow": 2
+      },
+      "id": "google-sheets-preguntas",
+      "name": "Obtener Preguntas y Respuestas",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [460, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credentials",
+          "name": "Google Sheets Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Procesar respuestas del examen y preparar para calificación\nconst formData = $input.first().json;\nconst preguntasDB = $input.last().json;\n\n// Extraer datos del estudiante\nconst estudiante = {\n  nombre: formData.nombre,\n  email: formData.email\n};\n\n// Separar preguntas múltiples y abiertas\nconst respuestasMultiples = [];\nconst respuestasAbiertas = [];\n\n// Procesar cada pregunta\nfor (const [key, value] of Object.entries(formData)) {\n  if (key.startsWith('q')) {\n    const preguntaId = parseInt(key.substring(1));\n    const preguntaInfo = preguntasDB.find(p => p.id === preguntaId);\n    \n    if (preguntaInfo) {\n      if (preguntaInfo.tipo === 'multiple') {\n        respuestasMultiples.push({\n          id: preguntaId,\n          pregunta: preguntaInfo.pregunta,\n          respuestaEstudiante: value,\n          respuestaCorrecta: preguntaInfo.respuestaCorrecta,\n          puntos: preguntaInfo.puntos || 1\n        });\n      } else if (preguntaInfo.tipo === 'abierta') {\n        respuestasAbiertas.push({\n          id: preguntaId,\n          pregunta: preguntaInfo.pregunta,\n          respuestaEstudiante: value,\n          respuestaCorrecta: preguntaInfo.respuestaCorrecta,\n          criteriosEvaluacion: preguntaInfo.criteriosEvaluacion || '',\n          puntos: preguntaInfo.puntos || 2\n        });\n      }\n    }\n  }\n}\n\nreturn {\n  estudiante,\n  respuestasMultiples,\n  respuestasAbiertas,\n  totalPreguntas: respuestasMultiples.length + respuestasAbiertas.length\n};"
+      },
+      "id": "procesar-respuestas",
+      "name": "Procesar Respuestas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calificar preguntas de opción múltiple\nconst data = $input.first().json;\nlet puntajeMultiples = 0;\nlet correctasMultiples = 0;\n\nconst resultadosMultiples = data.respuestasMultiples.map(pregunta => {\n  const esCorrecta = pregunta.respuestaEstudiante === pregunta.respuestaCorrecta;\n  if (esCorrecta) {\n    puntajeMultiples += pregunta.puntos;\n    correctasMultiples++;\n  }\n  \n  return {\n    ...pregunta,\n    esCorrecta,\n    puntosObtenidos: esCorrecta ? pregunta.puntos : 0\n  };\n});\n\nreturn {\n  ...data,\n  resultadosMultiples,\n  puntajeMultiples,\n  correctasMultiples,\n  totalMultiples: data.respuestasMultiples.length\n};"
+      },
+      "id": "calificar-multiples",
+      "name": "Calificar Múltiples",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "gpt-4",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un asistente de calificación académica experto. Tu tarea es evaluar respuestas abiertas de estudiantes basándote en criterios específicos. Debes ser justo, consistente y constructivo en tus evaluaciones.\n\nPara cada respuesta:\n1. Evalúa si la respuesta es correcta, parcialmente correcta o incorrecta\n2. Asigna un puntaje del 0 al máximo de puntos disponibles\n3. Proporciona retroalimentación constructiva\n4. Sé consistente en tus criterios de evaluación\n\nFormato de respuesta JSON:\n{\n  \"puntaje\": número,\n  \"retroalimentacion\": \"texto explicativo\",\n  \"categoria\": \"correcta|parcial|incorrecta\"\n}"
+            },
+            {
+              "role": "user",
+              "content": "=Evalúa las siguientes respuestas abiertas:\n\n{{$json.respuestasAbiertas.map((p, i) => `\nPregunta ${i+1}: ${p.pregunta}\nRespuesta del estudiante: ${p.respuestaEstudiante}\nRespuesta correcta/esperada: ${p.respuestaCorrecta}\nCriterios de evaluación: ${p.criteriosEvaluacion}\nPuntos máximos: ${p.puntos}\n`).join('\\n---\\n')}}\n\nPor favor evalúa cada respuesta y proporciona el resultado en formato JSON para cada una."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "ai-calificar-abiertas",
+      "name": "IA - Calificar Abiertas",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [900, 400],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Procesar resultados de IA y calcular puntaje final\nconst dataMultiples = $input.first().json;\nconst aiResponse = $input.last().json;\n\n// Parsear respuesta de IA\nlet evaluacionesIA;\ntry {\n  // La respuesta de IA debería contener evaluaciones en formato JSON\n  const aiContent = aiResponse.choices[0].message.content;\n  // Extraer JSONs de la respuesta\n  const jsonMatches = aiContent.match(/\\{[^}]+\\}/g);\n  evaluacionesIA = jsonMatches ? jsonMatches.map(match => JSON.parse(match)) : [];\n} catch (error) {\n  console.error('Error parsing AI response:', error);\n  // Fallback: asignar puntajes por defecto\n  evaluacionesIA = dataMultiples.respuestasAbiertas.map(p => ({\n    puntaje: Math.floor(p.puntos * 0.7), // 70% por defecto si hay error\n    retroalimentacion: 'Evaluación automática - revisar manualmente',\n    categoria: 'parcial'\n  }));\n}\n\n// Combinar respuestas abiertas con evaluaciones\nconst resultadosAbiertas = dataMultiples.respuestasAbiertas.map((pregunta, index) => {\n  const evaluacion = evaluacionesIA[index] || {\n    puntaje: 0,\n    retroalimentacion: 'No se pudo evaluar',\n    categoria: 'incorrecta'\n  };\n  \n  return {\n    ...pregunta,\n    puntosObtenidos: evaluacion.puntaje,\n    retroalimentacion: evaluacion.retroalimentacion,\n    categoria: evaluacion.categoria\n  };\n});\n\n// Calcular puntajes totales\nconst puntajeAbiertas = resultadosAbiertas.reduce((sum, r) => sum + r.puntosObtenidos, 0);\nconst puntajeTotal = dataMultiples.puntajeMultiples + puntajeAbiertas;\n\n// Calcular puntajes máximos\nconst maxPuntajeMultiples = dataMultiples.respuestasMultiples.reduce((sum, p) => sum + p.puntos, 0);\nconst maxPuntajeAbiertas = dataMultiples.respuestasAbiertas.reduce((sum, p) => sum + p.puntos, 0);\nconst maxPuntajeTotal = maxPuntajeMultiples + maxPuntajeAbiertas;\n\n// Calcular porcentaje y nota\nconst porcentaje = (puntajeTotal / maxPuntajeTotal) * 100;\nconst nota = Math.round(porcentaje / 10); // Escala 0-10\n\nreturn {\n  ...dataMultiples,\n  resultadosAbiertas,\n  puntajeAbiertas,\n  puntajeTotal,\n  maxPuntajeTotal,\n  porcentaje: Math.round(porcentaje * 100) / 100,\n  nota,\n  fechaEvaluacion: new Date().toISOString()\n};"
+      },
+      "id": "calcular-nota-final",
+      "name": "Calcular Nota Final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "examenes@tuinstitucion.com",
+        "toEmail": "={{$json.estudiante.email}}",
+        "subject": "Resultados de tu Examen - {{$json.estudiante.nombre}}",
+        "emailType": "html",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n    <style>\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n        .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }\n        .content { padding: 20px; }\n        .result-box { background-color: #f9f9f9; border-left: 4px solid #4CAF50; padding: 15px; margin: 20px 0; }\n        .score { font-size: 24px; font-weight: bold; color: #4CAF50; }\n        .section { margin: 20px 0; }\n        .question { background-color: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }\n        .correct { border-left: 4px solid #4CAF50; }\n        .incorrect { border-left: 4px solid #f44336; }\n        .partial { border-left: 4px solid #ff9800; }\n    </style>\n</head>\n<body>\n    <div class=\"header\">\n        <h1>Resultados del Examen</h1>\n        <h2>{{$json.estudiante.nombre}}</h2>\n    </div>\n    \n    <div class=\"content\">\n        <div class=\"result-box\">\n            <h2>Calificación Final</h2>\n            <div class=\"score\">{{$json.nota}}/10 ({{$json.porcentaje}}%)</div>\n            <p><strong>Puntaje:</strong> {{$json.puntajeTotal}} de {{$json.maxPuntajeTotal}} puntos</p>\n            <p><strong>Fecha de evaluación:</strong> {{$json.fechaEvaluacion}}</p>\n        </div>\n        \n        <div class=\"section\">\n            <h3>Resumen por Sección</h3>\n            <p><strong>Preguntas Múltiples:</strong> {{$json.correctasMultiples}}/{{$json.totalMultiples}} correctas ({{$json.puntajeMultiples}} puntos)</p>\n            <p><strong>Preguntas Abiertas:</strong> {{$json.puntajeAbiertas}} puntos de {{$json.resultadosAbiertas.reduce((sum, p) => sum + p.puntos, 0)}} posibles</p>\n        </div>\n        \n        <div class=\"section\">\n            <h3>Detalle de Preguntas Abiertas</h3>\n            {{$json.resultadosAbiertas.map((p, i) => `\n            <div class=\"question ${p.categoria === 'correcta' ? 'correct' : p.categoria === 'parcial' ? 'partial' : 'incorrect'}\">\n                <h4>Pregunta ${i+1}: ${p.pregunta}</h4>\n                <p><strong>Tu respuesta:</strong> ${p.respuestaEstudiante}</p>\n                <p><strong>Puntaje:</strong> ${p.puntosObtenidos}/${p.puntos}</p>\n                <p><strong>Retroalimentación:</strong> ${p.retroalimentacion}</p>\n            </div>\n            `).join('')}}\n        </div>\n        \n        <div class=\"section\">\n            <p><em>Este examen fue calificado automáticamente por un asistente de IA. Si tienes alguna pregunta sobre tu calificación, por favor contacta a tu instructor.</em></p>\n        </div>\n    </div>\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "enviar-email-resultados",
+      "name": "Enviar Email Resultados",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP Email"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "append",
+        "documentId": "1XCqrvg_y46-OUZSrKe-UraS1KckndqzZDtVqXFHT6W8",
+        "sheetName": "Resultados",
+        "range": "A:I",
+        "values": {
+          "values": [
+            [
+              "={{$json.estudiante.nombre}}",
+              "={{$json.estudiante.email}}",
+              "={{$json.nota}}",
+              "={{$json.porcentaje}}",
+              "={{$json.puntajeTotal}}",
+              "={{$json.maxPuntajeTotal}}",
+              "={{$json.correctasMultiples}}/{{$json.totalMultiples}}",
+              "={{$json.puntajeAbiertas}}",
+              "={{$json.fechaEvaluacion}}"
+            ]
+          ]
+        },
+        "options": {
+          "valueInputOption": "USER_ENTERED"
+        }
+      },
+      "id": "guardar-resultados",
+      "name": "Guardar Resultados",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1340, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credentials",
+          "name": "Google Sheets Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Examen procesado exitosamente\",\n  \"estudiante\": \"{{$json.estudiante.nombre}}\",\n  \"nota\": {{$json.nota}},\n  \"porcentaje\": {{$json.porcentaje}}\n}",
+        "options": {}
+      },
+      "id": "respuesta-webhook",
+      "name": "Respuesta Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Examen": {
+      "main": [
+        [
+          {
+            "node": "Obtener Preguntas y Respuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener Preguntas y Respuestas": {
+      "main": [
+        [
+          {
+            "node": "Procesar Respuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar Respuestas": {
+      "main": [
+        [
+          {
+            "node": "Calificar Múltiples",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IA - Calificar Abiertas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calificar Múltiples": {
+      "main": [
+        [
+          {
+            "node": "Calcular Nota Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA - Calificar Abiertas": {
+      "main": [
+        [
+          {
+            "node": "Calcular Nota Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular Nota Final": {
+      "main": [
+        [
+          {
+            "node": "Enviar Email Resultados",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Guardar Resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Email Resultados": {
+      "main": [
+        [
+          {
+            "node": "Respuesta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar Resultados": {
+      "main": [
+        [
+          {
+            "node": "Respuesta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "examen-virtual-workflow",
+  "tags": []
+}
