@@ -1,0 +1,236 @@
+(cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF'
+diff --git a/n8n-workflow.json b/n8n-workflow.json
+--- a/n8n-workflow.json
++++ b/n8n-workflow.json
+@@ -0,0 +1,229 @@
++{
++  "name": "Sistema de Corrección Automática de Exámenes",
++  "nodes": [
++    {
++      "parameters": {
++        "httpMethod": "POST",
++        "path": "examen",
++        "responseMode": "responseNode",
++        "options": {}
++      },
++      "id": "webhook-examen",
++      "name": "Webhook - Recibir Examen",
++      "type": "n8n-nodes-base.webhook",
++      "typeVersion": 1,
++      "position": [240, 300],
++      "webhookId": "examen-webhook"
++    },
++    {
++      "parameters": {
++        "operation": "read",
++        "documentId": "1XCqrvg_y46-OUZSrKe-UraS1KckndqzZDtVqXFHT6W8",
++        "sheetName": "Preguntas",
++        "options": {}
++      },
++      "id": "google-sheets-preguntas",
++      "name": "Google Sheets - Obtener Preguntas",
++      "type": "n8n-nodes-base.googleSheets",
++      "typeVersion": 4,
++      "position": [460, 300]
++    },
++    {
++      "parameters": {
++        "jsCode": "// Extraer datos del formulario\nconst formData = $input.first().json;\nconst nombre = formData.nombre;\nconst email = formData.email;\n\n// Crear objeto con todas las respuestas\nconst respuestas = {};\nfor (let i = 1; i <= 100; i++) {\n  const key = `q${i}`;\n  if (formData[key]) {\n    respuestas[i] = formData[key];\n  }\n}\n\n// Separar preguntas múltiples y abiertas\nconst preguntasMultiples = [];\nconst preguntasAbiertas = [];\n\n// Obtener preguntas de Google Sheets\nconst preguntas = $('Google Sheets - Obtener Preguntas').all();\n\npreguntas.forEach(pregunta => {\n  const preguntaData = pregunta.json;\n  if (preguntaData.tipo === 'multiple') {\n    preguntasMultiples.push({\n      id: preguntaData.id,\n      pregunta: preguntaData.pregunta,\n      respuestaCorrecta: preguntaData.respuesta,\n      respuestaEstudiante: respuestas[preguntaData.id] || ''\n    });\n  } else if (preguntaData.tipo === 'abierta') {\n    preguntasAbiertas.push({\n      id: preguntaData.id,\n      pregunta: preguntaData.pregunta,\n      respuestaCorrecta: preguntaData.respuesta,\n      respuestaEstudiante: respuestas[preguntaData.id] || ''\n    });\n  }\n});\n\nreturn [{\n  json: {\n    nombre,\n    email,\n    preguntasMultiples,\n    preguntasAbiertas,\n    totalPreguntas: preguntasMultiples.length + preguntasAbiertas.length\n  }\n}];"
++      },
++      "id": "procesar-respuestas",
++      "name": "Procesar Respuestas",
++      "type": "n8n-nodes-base.code",
++      "typeVersion": 2,
++      "position": [680, 300]
++    },
++    {
++      "parameters": {
++        "jsCode": "// Corregir preguntas múltiples\nconst data = $input.first().json;\nconst preguntasMultiples = data.preguntasMultiples;\n\nlet aciertosMultiples = 0;\nconst resultadosMultiples = [];\n\npreguntasMultiples.forEach(pregunta => {\n  const esCorrecta = pregunta.respuestaEstudiante === pregunta.respuestaCorrecta;\n  if (esCorrecta) aciertosMultiples++;\n  \n  resultadosMultiples.push({\n    id: pregunta.id,\n    pregunta: pregunta.pregunta,\n    respuestaCorrecta: pregunta.respuestaCorrecta,\n    respuestaEstudiante: pregunta.respuestaEstudiante,\n    esCorrecta,\n    puntuacion: esCorrecta ? 1 : 0\n  });\n});\n\nreturn [{\n  json: {\n    ...data,\n    resultadosMultiples,\n    aciertosMultiples,\n    totalMultiples: preguntasMultiples.length\n  }\n}];"
++      },
++      "id": "corregir-multiples",
++      "name": "Corregir Preguntas Múltiples",
++      "type": "n8n-nodes-base.code",
++      "typeVersion": 2,
++      "position": [900, 200]
++    },
++    {
++      "parameters": {
++        "authentication": "apiKey",
++        "resource": "chat",
++        "operation": "create",
++        "model": "gpt-4",
++        "messages": {
++          "messageValues": [
++            {
++              "role": "system",
++              "content": "Eres un profesor experto en corrección de exámenes. Tu tarea es evaluar respuestas de preguntas abiertas comparándolas con las respuestas correctas. Debes ser justo pero riguroso. Evalúa cada respuesta en una escala de 0 a 1, donde:\n- 0: Respuesta completamente incorrecta o vacía\n- 0.5: Respuesta parcialmente correcta\n- 1: Respuesta correcta o muy cercana a la correcta\n\nResponde solo con el número (0, 0.5 o 1) sin explicaciones adicionales."
++            },
++            {
++              "role": "user",
++              "content": "Pregunta: {{$json.pregunta}}\nRespuesta correcta: {{$json.respuestaCorrecta}}\nRespuesta del estudiante: {{$json.respuestaEstudiante}}\n\nEvalúa la respuesta del estudiante (0, 0.5 o 1):"
++            }
++          ]
++        },
++        "options": {}
++      },
++      "id": "ia-correccion",
++      "name": "IA - Corregir Preguntas Abiertas",
++      "type": "n8n-nodes-base.openAi",
++      "typeVersion": 1,
++      "position": [900, 400]
++    },
++    {
++      "parameters": {
++        "jsCode": "// Procesar correcciones de IA para preguntas abiertas\nconst data = $input.first().json;\nconst preguntasAbiertas = data.preguntasAbiertas;\n\n// Obtener resultados de IA\nconst resultadosIA = $('IA - Corregir Preguntas Abiertas').all();\n\nconst resultadosAbiertas = [];\nlet aciertosAbiertas = 0;\n\npreguntasAbiertas.forEach((pregunta, index) => {\n  const puntuacionIA = parseFloat(resultadosIA[index].json.content.trim()) || 0;\n  \n  resultadosAbiertas.push({\n    id: pregunta.id,\n    pregunta: pregunta.pregunta,\n    respuestaCorrecta: pregunta.respuestaCorrecta,\n    respuestaEstudiante: pregunta.respuestaEstudiante,\n    puntuacion: puntuacionIA\n  });\n  \n  aciertosAbiertas += puntuacionIA;\n});\n\nreturn [{\n  json: {\n    ...data,\n    resultadosAbiertas,\n    aciertosAbiertas,\n    totalAbiertas: preguntasAbiertas.length\n  }\n}];"
++      },
++      "id": "procesar-ia",
++      "name": "Procesar Resultados IA",
++      "type": "n8n-nodes-base.code",
++      "typeVersion": 2,
++      "position": [1120, 400]
++    },
++    {
++      "parameters": {
++        "jsCode": "// Calcular nota final\nconst data = $input.first().json;\n\nconst puntuacionMultiples = data.aciertosMultiples;\nconst puntuacionAbiertas = data.aciertosAbiertas;\nconst totalMultiples = data.totalMultiples;\nconst totalAbiertas = data.totalAbiertas;\nconst totalPreguntas = totalMultiples + totalAbiertas;\n\n// Calcular porcentajes (50% múltiples, 50% abiertas)\nconst porcentajeMultiples = (puntuacionMultiples / totalMultiples) * 50;\nconst porcentajeAbiertas = (puntuacionAbiertas / totalAbiertas) * 50;\nconst notaFinal = porcentajeMultiples + porcentajeAbiertas;\n\n// Determinar calificación\nlet calificacion = '';\nif (notaFinal >= 90) calificacion = 'Excelente';\nelse if (notaFinal >= 80) calificacion = 'Muy Bien';\nelse if (notaFinal >= 70) calificacion = 'Bien';\nelse if (notaFinal >= 60) calificacion = 'Suficiente';\nelse calificacion = 'Insuficiente';\n\nreturn [{\n  json: {\n    ...data,\n    puntuacionMultiples,\n    puntuacionAbiertas,\n    totalMultiples,\n    totalAbiertas,\n    porcentajeMultiples,\n    porcentajeAbiertas,\n    notaFinal: Math.round(notaFinal * 100) / 100,\n    calificacion\n  }\n}];"
++      },
++      "id": "calcular-nota",
++      "name": "Calcular Nota Final",
++      "type": "n8n-nodes-base.code",
++      "typeVersion": 2,
++      "position": [1340, 300]
++    },
++    {
++      "parameters": {
++        "authentication": "smtp",
++        "fromEmail": "{{$env.SMTP_FROM_EMAIL}}",
++        "toEmail": "={{$json.email}}",
++        "subject": "Resultados de tu Examen - {{$json.nombre}}",
++        "message": "Hola {{$json.nombre}},\n\nHas completado tu examen. Aquí están tus resultados:\n\n📊 **RESULTADOS GENERALES**\n• Nota Final: {{$json.notaFinal}}/100\n• Calificación: {{$json.calificacion}}\n\n📝 **DESGLOSE**\n• Preguntas Múltiples: {{$json.puntuacionMultiples}}/{{$json.totalMultiples}} ({{$json.porcentajeMultiples}}%)\n• Preguntas Abiertas: {{$json.puntuacionAbiertas}}/{{$json.totalAbiertas}} ({{$json.porcentajeAbiertas}}%)\n\n🔍 **DETALLES DE CORRECCIÓN**\n\n**Preguntas Múltiples:**\n{{$json.resultadosMultiples.map(r => `${r.id}. ${r.esCorrecta ? '✅' : '❌'} (Tu respuesta: ${r.respuestaEstudiante}, Correcta: ${r.respuestaCorrecta})`).join('\\n')}}\n\n**Preguntas Abiertas:**\n{{$json.resultadosAbiertas.map(r => `${r.id}. Puntuación: ${r.puntuacion}/1 (Tu respuesta: ${r.respuestaEstudiante})`).join('\\n')}}\n\n¡Gracias por participar en el examen!\n\nSaludos,\nSistema de Corrección Automática",
++        "options": {}
++      },
++      "id": "enviar-email",
++      "name": "Enviar Email con Resultados",
++      "type": "n8n-nodes-base.emailSend",
++      "typeVersion": 1,
++      "position": [1560, 300]
++    },
++    {
++      "parameters": {
++        "respondWith": "json",
++        "responseBody": "{\n  \"success\": true,\n  \"message\": \"Examen procesado correctamente\",\n  \"estudiante\": \"{{$json.nombre}}\",\n  \"nota\": {{$json.notaFinal}},\n  \"calificacion\": \"{{$json.calificacion}}\"\n}",
++        "options": {}
++      },
++      "id": "respuesta-webhook",
++      "name": "Respuesta Webhook",
++      "type": "n8n-nodes-base.respondToWebhook",
++      "typeVersion": 1,
++      "position": [1780, 300]
++    }
++  ],
++  "connections": {
++    "Webhook - Recibir Examen": {
++      "main": [
++        [
++          {
++            "node": "Google Sheets - Obtener Preguntas",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Google Sheets - Obtener Preguntas": {
++      "main": [
++        [
++          {
++            "node": "Procesar Respuestas",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Procesar Respuestas": {
++      "main": [
++        [
++          {
++            "node": "Corregir Preguntas Múltiples",
++            "type": "main",
++            "index": 0
++          },
++          {
++            "node": "IA - Corregir Preguntas Abiertas",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Corregir Preguntas Múltiples": {
++      "main": [
++        [
++          {
++            "node": "Calcular Nota Final",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "IA - Corregir Preguntas Abiertas": {
++      "main": [
++        [
++          {
++            "node": "Procesar Resultados IA",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Procesar Resultados IA": {
++      "main": [
++        [
++          {
++            "node": "Calcular Nota Final",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Calcular Nota Final": {
++      "main": [
++        [
++          {
++            "node": "Enviar Email con Resultados",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    },
++    "Enviar Email con Resultados": {
++      "main": [
++        [
++          {
++            "node": "Respuesta Webhook",
++            "type": "main",
++            "index": 0
++          }
++        ]
++      ]
++    }
++  },
++  "pinData": {},
++  "settings": {
++    "executionOrder": "v1"
++  },
++  "staticData": null,
++  "tags": [],
++  "triggerCount": 1,
++  "updatedAt": "2024-01-01T00:00:00.000Z",
++  "versionId": "1"
++}
+EOF
+)
