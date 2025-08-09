@@ -23,7 +23,7 @@
   </form>
 
   <script>
-    fetch("https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec")
+    action("https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec")
       .then(response => response.json())
       .then(preguntas => {
         const container = document.getElementById("preguntas");
