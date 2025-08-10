@@ -1,33 +1,29 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Examen para alumnos</title>
+  <meta charset="UTF-8" />
+  <title>Formulario Examen Dinámico</title>
 </head>
 <body>
-  <h1>Examen</h1>
+  <h1>Exam - Drilling</h1>
 
-  <form action="https://bc1.app.n8n.cloud/webhook/student-exam-submission" method="POST">
-    <label>Nombre:<br>
-      <input type="text" name="nombre" required>
-    </label><br><br>
+  <form action="https://bc1.app.n8n.cloud/webhook/669272d5-1758-470e-9960-080f3d96c705" method="POST">
 
-    <label>Email:<br>
-      <input type="email" name="email" required>
-    </label><br><br>
+    <label>Name:<br />
+      <input type="text" name="nombre" required />
+    </label><br /><br />
 
-    <!-- testId para que tu query en n8n funcione -->
-    <input type="hidden" name="testId" value="1">
+    <label>Email:<br />
+      <input type="email" name="email" required />
+    </label><br /><br />
 
     <div id="preguntas">Cargando preguntas...</div>
 
-    <button type="submit">Enviar examen</button>
+    <button type="submit">Send exam</button>
   </form>
 
   <script>
-    const scriptUrl = "PON_AQUI_TU_URL_DE_APPS_SCRIPT";
-
-    fetch(scriptUrl)
+    fetch("https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec")
       .then(response => response.json())
       .then(preguntas => {
         const container = document.getElementById("preguntas");
@@ -36,19 +32,19 @@
         preguntas.forEach(p => {
           const div = document.createElement("div");
 
-          // Asumo que en tu hoja hay una columna "tipo" con "multiple" o "abierta"
-          if (p.tipo && p.tipo.toLowerCase() === "multiple") {
+          // Suponemos que tienes una columna 'tipo' con valores "multiple" o "abierta"
+          if (p.tipo === "multiple") {
             div.innerHTML = `
               <p>${p.id}. ${p.pregunta}</p>
-              <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br>
-              <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br>
-              <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br>
-              <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br>
+              <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br />
+              <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br />
+              <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br />
+              <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br />
             `;
-          } else {
+          } else if (p.tipo === "abierta") {
             div.innerHTML = `
               <p>${p.id}. ${p.pregunta}</p>
-              <textarea name="q${p.id}" rows="3" cols="60" required></textarea>
+              <textarea name="q${p.id}" rows="4" cols="60" required></textarea>
             `;
           }
 
@@ -57,7 +53,8 @@
         });
       })
       .catch(err => {
-        document.getElementById("preguntas").innerText = "Error al cargar preguntas.";
+        document.getElementById("preguntas").innerText =
+          "Error al cargar preguntas.";
         console.error(err);
       });
   </script>
