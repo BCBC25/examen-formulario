@@ -1,60 +1,74 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Formulario Examen Dinámico</title>
+  <meta charset="UTF-8">
+  <title>Prueba para alumnos</title>
 </head>
 <body>
-  <h1>Exam - Drilling</h1>
+  <h1>Prueba</h1>
 
-  <form action="https://bc1.app.n8n.cloud/webhook/669272d5-1758-470e-9960-080f3d96c705" method="POST">
+  <form action="https://bc1.app.n8n.cloud/webhook/student-exam-submission" method="POST">
+    <label>Nombre:<br>
+      <input type="text" name="nombre" required>
+    </label><br><br>
 
-    <label>Name:<br />
-      <input type="text" name="nombre" required />
-    </label><br /><br />
+    <label>Email:<br>
+      <input type="email" name="email" required>
+    </label><br><br>
 
-    <label>Email:<br />
-      <input type="email" name="email" required />
-    </label><br /><br />
+    <!-- testId para que tu flujo en n8n sepa qué prueba es -->
+    <input type="hidden" name="testId" value="1">
 
     <div id="preguntas">Cargando preguntas...</div>
 
-    <button type="submit">Send exam</button>
+    <button type="submit">Enviar examen</button>
   </form>
 
   <script>
-    fetch("https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec")
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+
+    fetch(scriptUrl)
       .then(response => response.json())
       .then(preguntas => {
         const container = document.getElementById("preguntas");
         container.innerHTML = "";
 
         preguntas.forEach(p => {
+          const tipo = (p.tipo || "").toLowerCase();
           const div = document.createElement("div");
+          let html = `<p>${p.id}. ${p.pregunta}</p>`;
 
-          // Suponemos que tienes una columna 'tipo' con valores "multiple" o "abierta"
-          if (p.tipo === "multiple") {
-            div.innerHTML = `
-              <p>${p.id}. ${p.pregunta}</p>
-              <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br />
-              <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br />
-              <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br />
-              <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br />
-            `;
-          } else if (p.tipo === "abierta") {
-            div.innerHTML = `
-              <p>${p.id}. ${p.pregunta}</p>
-              <textarea name="q${p.id}" rows="4" cols="60" required></textarea>
+          if (tipo === "multiple option") {
+            html += `
+              <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br>
+              <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br>
+              <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br>
+              <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br>
             `;
           }
+          else if (tipo === "open-ended") {
+            html += `<textarea name="q${p.id}" rows="4" cols="60" required></textarea>`;
+          }
+          else if (tipo === "true/false") {
+            html += `
+              <label><input type="radio" name="q${p.id}" value="true" required> Verdadero</label><br>
+              <label><input type="radio" name="q${p.id}" value="false"> Falso</label><br>
+            `;
+          }
+          else if (tipo === "calculation") {
+            html += `<input type="number" name="q${p.id}" step="any" required>`;
+          }
+          else {
+            html += `<input type="text" name="q${p.id}" required>`;
+          }
 
+          div.innerHTML = html;
           container.appendChild(div);
           container.appendChild(document.createElement("br"));
         });
       })
       .catch(err => {
-        document.getElementById("preguntas").innerText =
-          "Error al cargar preguntas.";
+        document.getElementById("preguntas").innerText = "Error al cargar preguntas.";
         console.error(err);
       });
   </script>
