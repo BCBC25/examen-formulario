@@ -16,7 +16,7 @@
       <input type="email" name="email" required>
     </label><br><br>
 
-    <!-- testId para que tu flujo en n8n sepa qué prueba es -->
+    <!-- testId para que el nodo PostgreSQL en n8n tenga valor -->
     <input type="hidden" name="testId" value="1">
 
     <div id="preguntas">Cargando preguntas...</div>
@@ -25,10 +25,11 @@
   </form>
 
   <script>
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+    // URL de donde obtendremos las preguntas (puede ser un webhook GET de n8n)
+    const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
 
-    fetch(scriptUrl)
-      .then(response => response.json())
+    fetch(questionsUrl)
+      .then(res => res.json())
       .then(preguntas => {
         const container = document.getElementById("preguntas");
         container.innerHTML = "";
@@ -45,20 +46,16 @@
               <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br>
               <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br>
             `;
-          }
-          else if (tipo === "open-ended") {
+          } else if (tipo === "open-ended") {
             html += `<textarea name="q${p.id}" rows="4" cols="60" required></textarea>`;
-          }
-          else if (tipo === "true/false") {
+          } else if (tipo === "true/false") {
             html += `
               <label><input type="radio" name="q${p.id}" value="true" required> Verdadero</label><br>
               <label><input type="radio" name="q${p.id}" value="false"> Falso</label><br>
             `;
-          }
-          else if (tipo === "calculation") {
+          } else if (tipo === "calculation") {
             html += `<input type="number" name="q${p.id}" step="any" required>`;
-          }
-          else {
+          } else {
             html += `<input type="text" name="q${p.id}" required>`;
           }
 
