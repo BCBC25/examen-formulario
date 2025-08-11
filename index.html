@@ -1,33 +1,36 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Prueba para alumnos</title>
 </head>
 <body>
   <h1>Prueba</h1>
 
-  <form action="https://gilloli.app.n8n.cloud/webhook/student-exam-submission" method="POST">
+  <form id="examForm">
     <label>Nombre:<br>
-      <input type="text" name="nombre" required>
-    </label><br><br>
+      <input type="text" name="nombre" required />
+    </label><br /><br />
 
     <label>Email:<br>
-      <input type="email" name="email" required>
-    </label><br><br>
+      <input type="email" name="email" required />
+    </label><br /><br />
 
-    <!-- testId para que el nodo PostgreSQL en n8n tenga valor -->
-    <input type="hidden" name="testId" value="1">
+    <input type="hidden" name="testId" value="1" />
 
     <div id="preguntas">Cargando preguntas...</div>
 
     <button type="submit">Enviar examen</button>
   </form>
 
-  <script>
-    // URL de donde obtendremos las preguntas (puede ser un webhook GET de n8n)
-    const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+  <div id="resultado"></div>
 
+  <script>
+    const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+    const form = document.getElementById('examForm');
+    const resultadoDiv = document.getElementById('resultado');
+
+    // Cargar preguntas y mostrarlas
     fetch(questionsUrl)
       .then(res => res.json())
       .then(preguntas => {
@@ -68,6 +71,39 @@
         document.getElementById("preguntas").innerText = "Error al cargar preguntas.";
         console.error(err);
       });
+
+    // Capturar el envío del formulario
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      // Construir objeto con todos los datos del formulario
+      const formData = new FormData(form);
+      const data = {};
+      formData.forEach((value, key) => {
+        data[key] = value;
+      });
+
+      try {
+        const response = await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+          resultadoDiv.innerText = "Examen enviado correctamente.";
+          form.reset();
+        } else {
+          resultadoDiv.innerText = "Error al enviar el examen.";
+          console.error("Error en la respuesta del webhook:", response.statusText);
+        }
+      } catch (error) {
+        resultadoDiv.innerText = "Error al enviar el examen.";
+        console.error("Error al enviar el formulario:", error);
+      }
+    });
   </script>
 </body>
 </html>
