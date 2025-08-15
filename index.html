@@ -30,7 +30,7 @@
     const form = document.getElementById('examForm');
     const resultadoDiv = document.getElementById('resultado');
 
-    // Cargar preguntas y mostrarlas
+    // Cargar preguntas y mostrarlas (Esta parte no se modifica)
     fetch(questionsUrl)
       .then(res => res.json())
       .then(preguntas => {
@@ -40,7 +40,7 @@
         preguntas.forEach(p => {
           const tipo = (p.tipo || "").toLowerCase();
           const div = document.createElement("div");
-          let html = `<p>${p.id}. ${p.pregunta}</p>`;
+          let html = `<p>${p.id}. ${p.pregunta}</p >`;
 
           if (tipo === "multiple option") {
             html += `
@@ -72,35 +72,54 @@
         console.error(err);
       });
 
-    // Capturar el envío del formulario
+    // --- CÓDIGO CORREGIDO PARA EL ENVÍO DEL FORMULARIO ---
+    // Capturar el envío del formulario y enviarlo en el formato correcto para n8n
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
 
-      // Construir objeto con todos los datos del formulario
       const formData = new FormData(form);
-      const data = {};
-      formData.forEach((value, key) => {
-        data[key] = value;
-      });
 
+      // 1. Crear un objeto base para enviar
+      const payload = {
+        nombre: formData.get('nombre'),
+        email: formData.get('email'),
+        testId: formData.get('testId'),
+        answers: [] // 2. Inicializar un array vacío para las respuestas
+      };
+
+      // 3. Recorrer los datos del formulario y poblar el array 'answers'
+      for (const [key, value] of formData.entries()) {
+        if (key.startsWith('q')) {
+          const questionId = key.substring(1); // Extraer el número de la pregunta (de 'q1' a '1')
+          payload.answers.push({
+            questionId: questionId,
+            answer: value
+          });
+        }
+      }
+
+      // 4. Enviar el objeto 'payload' construido a n8n
       try {
+        resultadoDiv.innerText = "Enviando examen, por favor espere...";
+
         const response = await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload), // Enviar el payload con el formato correcto
         });
 
         if (response.ok) {
-          resultadoDiv.innerText = "Examen enviado correctamente.";
+          resultadoDiv.innerText = "Examen enviado correctamente. Recibirá su calificación por correo.";
           form.reset();
         } else {
-          resultadoDiv.innerText = "Error al enviar el examen.";
-          console.error("Error en la respuesta del webhook:", response.statusText);
+          const errorText = await response.text();
+          resultadoDiv.innerText = `Error al enviar el examen. Código: ${response.status}`;
+          console.error("Error en la respuesta del webhook:", response.status, errorText);
         }
       } catch (error) {
-        resultadoDiv.innerText = "Error al enviar el examen.";
+        resultadoDiv.innerText = "Error de red al enviar el examen.";
         console.error("Error al enviar el formulario:", error);
       }
     });
