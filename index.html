@@ -2,13 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>TEST</title>
+  <title>Prueba para alumnos</title>
 </head>
 <body>
-  <h1>DRILLING TEST</h1>
+  <h1>Prueba</h1>
 
   <form id="examForm">
-    <label>Name:<br>
+    <label>Nombre:<br>
       <input type="text" name="nombre" required />
     </label><br /><br />
 
@@ -53,8 +53,8 @@
             html += `<textarea name="q${p.id}" rows="4" cols="60" required></textarea>`;
           } else if (tipo === "true/false") {
             html += `
-              <label><input type="radio" name="q${p.id}" value="true" required> True</label><br>
-              <label><input type="radio" name="q${p.id}" value="false"> False</label><br>
+              <label><input type="radio" name="q${p.id}" value="true" required> Verdadero</label><br>
+              <label><input type="radio" name="q${p.id}" value="false"> Falso</label><br>
             `;
           } else if (tipo === "calculation") {
             html += `<input type="number" name="q${p.id}" step="any" required>`;
@@ -126,3 +126,4 @@
   </script>
 </body>
 </html>
+
