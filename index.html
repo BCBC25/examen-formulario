@@ -2,14 +2,14 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Prueba para alumnos</title>
+  <title>TEST</title>
 </head>
 <body>
-  <h1>Prueba</h1>
+  <h1>DRILLING TEST</h1>
 
   <form id="examForm">
-    <label>Nombre:<br>
-      <input type="text" name="nombre" required />
+    <label>Name:<br>
+      <input type="text" name="name" required />
     </label><br /><br />
 
     <label>Email:<br>
@@ -18,9 +18,9 @@
 
     <input type="hidden" name="testId" value="1" />
 
-    <div id="preguntas">Cargando preguntas...</div>
+    <div id="preguntas">Loading questions...</div>
 
-    <button type="submit">Enviar examen</button>
+    <button type="submit">Send exam</button>
   </form>
 
   <div id="resultado"></div>
@@ -53,8 +53,8 @@
             html += `<textarea name="q${p.id}" rows="4" cols="60" required></textarea>`;
           } else if (tipo === "true/false") {
             html += `
-              <label><input type="radio" name="q${p.id}" value="true" required> Verdadero</label><br>
-              <label><input type="radio" name="q${p.id}" value="false"> Falso</label><br>
+              <label><input type="radio" name="q${p.id}" value="true" required> True</label><br>
+              <label><input type="radio" name="q${p.id}" value="false"> False</label><br>
             `;
           } else if (tipo === "calculation") {
             html += `<input type="number" name="q${p.id}" step="any" required>`;
@@ -81,7 +81,7 @@
 
       // 1. Crear un objeto base para enviar
       const payload = {
-        nombre: formData.get('nombre'),
+        nombre: formData.get('name'),
         email: formData.get('email'),
         testId: formData.get('testId'),
         answers: [] // 2. Inicializar un array vacío para las respuestas
