@@ -100,7 +100,7 @@
 
       // 4. Enviar el objeto 'payload' construido a n8n
       try {
-        resultadoDiv.innerText = "Enviando examen, por favor espere...";
+        resultadoDiv.innerText = "Submitting exam, please wait...";
 
         const response = await fetch('https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission', {
           method: 'POST',
@@ -111,7 +111,7 @@
         });
 
         if (response.ok) {
-          resultadoDiv.innerText = "Examen enviado correctamente. Recibirá su calificación por correo.";
+          resultadoDiv.innerText = "Exam submitted successfully. You will receive your grade by email.";
           form.reset();
         } else {
           const errorText = await response.text();
@@ -119,7 +119,7 @@
           console.error("Error en la respuesta del webhook:", response.status, errorText);
         }
       } catch (error) {
-        resultadoDiv.innerText = "Error de red al enviar el examen.";
+        resultadoDiv.innerText = "Network error while submitting the exam.";
         console.error("Error al enviar el formulario:", error);
       }
     });
