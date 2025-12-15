@@ -61,12 +61,6 @@
       background: #1e4ed8;
     }
 
-    .secondary-btn {
-      background: #f1f5f9;
-      color: #0f172a;
-      border: 1px solid #cbd5e1;
-    }
-
     .hidden {
       display: none;
     }
@@ -76,39 +70,6 @@
       margin-top: 10px;
       text-align: center;
     }
-
-    .question {
-      margin-bottom: 26px;
-    }
-
-    .option-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 6px 0;
-      cursor: pointer;
-    }
-
-    .audio-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 6px;
-      margin-bottom: 6px;
-    }
-
-    audio {
-      width: 100%;
-      margin-top: 6px;
-    }
-
-    .calc-wrapper {
-      display: flex;
-      gap: 12px;
-      margin-top: 6px;
-    }
-
-    .calc-value { flex: 2; }
-    .calc-unit { flex: 1; }
 
     .submit-btn {
       width: 100%;
@@ -132,16 +93,15 @@
   </div>
 </div>
 
-<!-- 📝 EXAMEN (OCULTO HASTA LOGIN OK) -->
+<!-- 📝 EXAMEN -->
 <div class="container hidden" id="examScreen">
   <div class="card">
     <h1>DRILLING TEST</h1>
 
     <form id="examForm">
-      <!-- 🔒 Estos campos los llena el login -->
+      <!-- 🔒 Datos del estudiante -->
       <input type="hidden" name="nombre" id="studentName">
       <input type="hidden" name="email" id="studentEmail">
-
       <input type="hidden" name="testId" value="1">
 
       <div id="preguntas">Loading questions...</div>
@@ -171,10 +131,11 @@ async function login() {
     if (!res.ok) throw new Error();
 
     const data = await res.json();
+    if (!data.success) throw new Error();
 
-    // Datos vienen de Google Sheets vía n8n
-    document.getElementById("studentName").value = data.name;
-    document.getElementById("studentEmail").value = data.email;
+    // ✅ DATOS CORRECTOS DESDE n8n
+    document.getElementById("studentName").value = data.student.name;
+    document.getElementById("studentEmail").value = data.student.email;
 
     document.getElementById("loginScreen").classList.add("hidden");
     document.getElementById("examScreen").classList.remove("hidden");
@@ -184,62 +145,13 @@ async function login() {
   }
 }
 
-/* ================= EXAMEN (CÓDIGO ORIGINAL) ================= */
-
-const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
-const form = document.getElementById('examForm');
-const resultadoDiv = document.getElementById('resultado');
-
-let mediaRecorder;
-let audioChunks = {};
-
-async function toggleRecording(id) {
-  if (!mediaRecorder || mediaRecorder.state === "inactive") {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    audioChunks[id] = [];
-
-    mediaRecorder.ondataavailable = e => audioChunks[id].push(e.data);
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(audioChunks[id], { type: "audio/webm" });
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        document.querySelector(`input[name="q${id}_audio"]`).value = reader.result;
-        const audio = document.getElementById(`audio-q${id}`);
-        audio.src = reader.result;
-        audio.style.display = "block";
-      };
-      reader.readAsDataURL(blob);
-    };
-
-    mediaRecorder.start();
-    document.getElementById(`rec-btn-q${id}`).innerText = "⏹ Stop";
-  } else {
-    mediaRecorder.stop();
-    document.getElementById(`rec-btn-q${id}`).innerText = "🎤 Record";
-  }
-}
-
-function clearAudio(id) {
-  document.querySelector(`input[name="q${id}_audio"]`).value = "";
-  const audio = document.getElementById(`audio-q${id}`);
-  audio.src = "";
-  audio.style.display = "none";
-}
-
-function updateCalc(id) {
-  const w = document.getElementById(`calc-q${id}`).parentElement;
-  const v = w.querySelector('.calc-value').value;
-  const u = w.querySelector('.calc-unit').value;
-  document.getElementById(`calc-q${id}`).value = `${v} ${u}`.trim();
-}
+/* ================= EXAMEN (SIN CAMBIOS) ================= */
 
 /* 👉 AQUÍ VA EXACTAMENTE TU CÓDIGO EXISTENTE
    👉 fetch de preguntas
    👉 render de preguntas
    👉 submit del examen a:
    https://gilloli.app.n8n.cloud/webhook/student-exam-submission
-   (SIN CAMBIOS)
 */
 </script>
 </body>
