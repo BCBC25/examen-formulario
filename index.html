@@ -30,6 +30,76 @@
     const form = document.getElementById('examForm');
     const resultadoDiv = document.getElementById('resultado');
 
+    // ---- AUDIO helpers (solo añadido) ----
+    const recorders = {};      // { [questionId]: MediaRecorder }
+    const audioChunks = {};    // { [questionId]: BlobPart[] }
+    const audioStreams = {};   // { [questionId]: MediaStream }
+
+    async function toggleRecording(questionId) {
+      const btn = document.getElementById(`rec-btn-q${questionId}`);
+      const hidden = document.querySelector(`input[name="q${questionId}_audio"]`);
+      const audioEl = document.getElementById(`audio-q${questionId}`);
+
+      // Si ya está grabando -> parar
+      if (recorders[questionId] && recorders[questionId].state === "recording") {
+        recorders[questionId].stop();
+        btn.textContent = "🎤 Record";
+        return;
+      }
+
+      // Empezar grabación
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioStreams[questionId] = stream;
+
+        const mr = new MediaRecorder(stream);
+        recorders[questionId] = mr;
+        audioChunks[questionId] = [];
+
+        mr.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) audioChunks[questionId].push(e.data);
+        };
+
+        mr.onstop = () => {
+          // Cerrar micrófono
+          if (audioStreams[questionId]) {
+            audioStreams[questionId].getTracks().forEach(t => t.stop());
+            delete audioStreams[questionId];
+          }
+
+          const blob = new Blob(audioChunks[questionId], { type: "audio/webm" });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            // DataURL: "data:audio/webm;base64,...."
+            const dataUrl = reader.result;
+
+            // Guardar en hidden para enviar a n8n
+            hidden.value = dataUrl;
+
+            // Mostrar preview
+            audioEl.src = dataUrl;
+            audioEl.style.display = "block";
+          };
+          reader.readAsDataURL(blob);
+        };
+
+        mr.start();
+        btn.textContent = "⏹ Stop";
+      } catch (err) {
+        console.error(err);
+        alert("No se pudo acceder al micrófono. Revisa permisos del navegador.");
+      }
+    }
+
+    function clearAudio(questionId) {
+      const hidden = document.querySelector(`input[name="q${questionId}_audio"]`);
+      const audioEl = document.getElementById(`audio-q${questionId}`);
+      hidden.value = "";
+      audioEl.removeAttribute("src");
+      audioEl.style.display = "none";
+    }
+    // ---- FIN AUDIO helpers ----
+
     // Cargar preguntas y mostrarlas (Esta parte no se modifica)
     fetch(questionsUrl)
       .then(res => res.json())
@@ -40,7 +110,7 @@
         preguntas.forEach(p => {
           const tipo = (p.tipo || "").toLowerCase();
           const div = document.createElement("div");
-          let html = `<p>${p.id}. ${p.pregunta}</p >`;
+          let html = `<p>${p.id}. ${p.pregunta}</p>`;
 
           if (tipo === "multiple option") {
             html += `
@@ -50,7 +120,17 @@
               <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br>
             `;
           } else if (tipo === "open-ended") {
-            html += `<textarea name="q${p.id}" rows="4" cols="60" required></textarea>`;
+            // Añadido: audio opcional sin cambiar tu flujo
+            html += `
+              <textarea name="q${p.id}" rows="4" cols="60" required></textarea><br>
+
+              <button type="button" id="rec-btn-q${p.id}" onclick="toggleRecording(${p.id})">🎤 Record</button>
+              <button type="button" onclick="clearAudio(${p.id})">🗑️ Clear audio</button><br>
+
+              <audio id="audio-q${p.id}" controls style="display:none; margin-top:6px;"></audio>
+
+              <input type="hidden" name="q${p.id}_audio" value="" />
+            `;
           } else if (tipo === "true/false") {
             html += `
               <label><input type="radio" name="q${p.id}" value="true" required> True</label><br>
@@ -90,7 +170,7 @@
       // 3. Recorrer los datos del formulario y poblar el array 'answers'
       for (const [key, value] of formData.entries()) {
         if (key.startsWith('q')) {
-          const questionId = key.substring(1); // Extraer el número de la pregunta (de 'q1' a '1')
+          const questionId = key.substring(1); // de 'q1' a '1' o '1_audio'
           payload.answers.push({
             questionId: questionId,
             answer: value
@@ -107,7 +187,7 @@
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(payload), // Enviar el payload con el formato correcto
+          body: JSON.stringify(payload),
         });
 
         if (response.ok) {
