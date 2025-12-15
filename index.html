@@ -32,7 +32,7 @@
     }
 
     label {
-      font-weight: 500;
+      font-weight: 400;
     }
 
     input, textarea {
@@ -73,26 +73,24 @@
     }
 
     .question {
-      margin-bottom: 28px;
+      margin-bottom: 26px;
     }
 
-    /* ===== MULTIPLE CHOICE COMPACT ===== */
+    /* ===== MULTIPLE CHOICE (A B C D) ===== */
     .multiple-options label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 4px 0;
-      font-weight: 400;
+      display: block;
+      margin: 4px 0;              /* 🔹 espacio vertical reducido */
     }
 
     .multiple-options input[type="radio"] {
-      margin: 0;
+      margin-right: 6px;          /* 🔹 radio cerca del texto */
+      vertical-align: middle;
     }
 
-    .multiple-options label:hover {
-      background: #f1f5f9;
-      border-radius: 6px;
-      padding-left: 4px;
+    /* ===== TRUE / FALSE ===== */
+    .question label input[type="radio"] {
+      margin-right: 6px;
+      vertical-align: middle;
     }
 
     /* ===== OPEN ENDED + AUDIO ===== */
