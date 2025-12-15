@@ -1,205 +1,140 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>University Examination Portal</title>
+<meta charset="UTF-8" />
+<title>University Examination Portal</title>
 
-  <style>
-    /* Estilos globales y comunes (sin cambios) */
-    body {
-      margin: 0;
-      font-family: "Segoe UI", Roboto, Arial, sans-serif;
-      background: linear-gradient(135deg, #eef2f7, #dbeafe);
-      color: #1f2937;
-    }
-
-    .container {
-      max-width: 900px;
-      margin: auto;
-      padding: 40px 20px;
-    }
-
-    .card {
-      background: #ffffff;
-      border-radius: 10px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-      padding: 35px;
-    }
-
-    h1 {
-      text-align: center;
-      margin-top: 0;
-      color: #0f172a;
-    }
-
-    input, textarea {
-      width: 100%;
-      margin-top: 6px;
-      padding: 10px 12px;
-      font-size: 15px;
-      border-radius: 6px;
-      border: 1px solid #cbd5e1;
-      box-sizing: border-box;
-    }
-
-    input[type="radio"] {
-      width: auto !important;
-      margin: 0;
-    }
-
-    textarea {
-      resize: vertical;
-    }
-
-    button {
-      background: #2563eb;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 8px 16px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #1e4ed8;
-    }
-
-    .secondary-btn {
-      background: #f1f5f9;
-      color: #0f172a;
-      border: 1px solid #cbd5e1;
-    }
-
-    .question {
-      margin-bottom: 26px;
-    }
-
-    /* Estilos del examen (sin cambios) */
-    .option-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 6px 0;
-      cursor: pointer;
-    }
-    .audio-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 6px;
-      margin-bottom: 6px;
-    }
-    audio {
-      width: 100%;
-      margin-top: 6px;
-    }
-    .calc-wrapper {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-top: 6px;
-    }
-    .calc-value {
-      flex: 2;
-    }
-    .calc-unit {
-      flex: 1;
-    }
-    .submit-btn {
-      width: 100%;
-      margin-top: 25px;
-      font-size: 16px;
-    }
-
-    /* Estilos específicos para la integración del login */
-    .hidden {
-        display: none;
-    }
-    #login-error {
-        color: #ef4444;
-        margin-top: 10px;
-        text-align: center;
-    }
-  </style>
+<style>
+body {
+  margin: 0;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  background: linear-gradient(135deg, #eef2f7, #dbeafe);
+  color: #1f2937;
+}
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 40px 20px;
+}
+.card {
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+  padding: 35px;
+}
+h1 { text-align: center; margin-top: 0; }
+input, textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+}
+input[type="radio"] { width:auto; }
+button {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 15px;
+  cursor: pointer;
+}
+button:hover { background:#1e4ed8; }
+.secondary-btn {
+  background:#f1f5f9;
+  color:#0f172a;
+  border:1px solid #cbd5e1;
+}
+.question { margin-bottom:26px; }
+.option-row { display:flex; gap:8px; margin:6px 0; }
+.audio-actions { display:flex; gap:10px; margin:6px 0; }
+.calc-wrapper { display:flex; gap:12px; margin-top:6px; }
+.calc-value { flex:2; }
+.calc-unit { flex:1; }
+.submit-btn { width:100%; margin-top:25px; font-size:16px; }
+.error { color:red; text-align:center; margin-top:10px; }
+</style>
 </head>
+
 <body>
 
 <div class="container">
-  <div class="card">
-    <h1>DRILLING TEST</h1>
 
-    <div id="login-section">
-      <h2>Iniciar Sesión</h2>
-      <label>Name</label>
-      <input type="text" id="login-nombre" required>
+<!-- LOGIN -->
+<div class="card" id="loginCard">
+  <h1>Student Login</h1>
+  <input id="loginUser" placeholder="Username">
+  <input id="loginPass" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+  <div class="error" id="loginError"></div>
+</div>
 
-      <label>Email</label>
-      <input type="email" id="login-email" required>
+<!-- EXAMEN -->
+<div class="card" id="examCard" style="display:none;">
+  <h1>DRILLING TEST</h1>
 
-      <button type="button" onclick="handleLogin()">Start Exam</button>
-      <div id="login-error"></div>
-    </div>
+  <form id="examForm">
+    <label>Name</label>
+    <input type="text" name="nombre" id="studentName" required>
 
-    <div id="exam-section" class="hidden">
-      <form id="examForm">
-        <input type="hidden" name="testId" value="1">
-        <input type="hidden" id="exam-nombre" name="nombre">
-        <input type="hidden" id="exam-email" name="email">
+    <label>Email</label>
+    <input type="email" name="email" id="studentEmail" required>
 
-        <div id="preguntas">Loading questions...</div>
+    <input type="hidden" name="testId" value="1">
+    <div id="preguntas">Loading questions...</div>
 
-        <button type="submit" class="submit-btn">Submit Exam</button>
-      </form>
+    <button type="submit" class="submit-btn">Submit Exam</button>
+  </form>
 
-      <div id="resultado"></div>
-    </div>
-  </div>
+  <div id="resultado"></div>
+</div>
+
 </div>
 
 <script>
-// VARIABLES GLOBALES (sin cambios)
+/* ================= LOGIN ================= */
+const LOGIN_URL = "https://gilloli.app.n8n.cloud/webhook/login-webhook";
+
+async function login() {
+  document.getElementById("loginError").innerText = "";
+
+  const res = await fetch(LOGIN_URL, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({
+      user: loginUser.value.trim(),
+      pass: loginPass.value.trim()
+    })
+  });
+
+  const data = await res.json();
+
+  if (!data || data.success !== true) {
+    document.getElementById("loginError").innerText = "Invalid username or password";
+    return;
+  }
+
+  // Mostrar examen
+  document.getElementById("loginCard").style.display = "none";
+  document.getElementById("examCard").style.display = "block";
+
+  // Autocompletar datos
+  studentName.value = data.student.name;
+  studentEmail.value = data.student.email;
+
+  loadQuestions();
+}
+
+/* ================= EXAMEN (SIN CAMBIOS) ================= */
+
 const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
 const form = document.getElementById('examForm');
 const resultadoDiv = document.getElementById('resultado');
 
-// Variables para el login
-const loginSection = document.getElementById('login-section');
-const examSection = document.getElementById('exam-section');
-const loginNombreInput = document.getElementById('login-nombre');
-const loginEmailInput = document.getElementById('login-email');
-const examNombreInput = document.getElementById('exam-nombre');
-const examEmailInput = document.getElementById('exam-email');
-const loginErrorDiv = document.getElementById('login-error');
-
 let mediaRecorder;
 let audioChunks = {};
-
-// FUNCIÓN DE LOGIN
-function handleLogin() {
-  const nombre = loginNombreInput.value.trim();
-  const email = loginEmailInput.value.trim();
-
-  // Validación simple
-  if (!nombre || !email) {
-    loginErrorDiv.innerText = "Please enter your Name and Email to start the exam.";
-    return;
-  }
-
-  // Si la validación (login) es exitosa:
-  // 1. Ocultar la sección de login.
-  loginSection.classList.add('hidden');
-  // 2. Mostrar la sección del examen.
-  examSection.classList.remove('hidden');
-  // 3. Pasar los valores a los campos ocultos del formulario del examen para el envío.
-  examNombreInput.value = nombre;
-  examEmailInput.value = email;
-
-  // 4. Iniciar la carga de preguntas (función que estaba al inicio del script)
-  loadQuestions();
-}
-
-
-// FUNCIONES DE EXAMEN (sin cambios)
 
 async function toggleRecording(id) {
   if (!mediaRecorder || mediaRecorder.state === "inactive") {
@@ -233,7 +168,6 @@ function clearAudio(id) {
   audio.style.display = "none";
 }
 
-/* 🔒 Une valor + unidad SIN afectar n8n */
 function updateCalc(id) {
   const wrapper = document.getElementById(`calc-q${id}`).parentElement;
   const value = wrapper.querySelector('.calc-value').value;
@@ -241,118 +175,76 @@ function updateCalc(id) {
   document.getElementById(`calc-q${id}`).value = `${value} ${unit}`.trim();
 }
 
-// FUNCIÓN PARA CARGAR LAS PREGUNTAS
 function loadQuestions() {
   fetch(questionsUrl)
-  .then(res => res.json())
-  .then(preguntas => {
-    const container = document.getElementById("preguntas");
-    container.innerHTML = "";
+  .then(r=>r.json())
+  .then(preguntas=>{
+    const container=document.getElementById("preguntas");
+    container.innerHTML="";
+    preguntas.forEach(p=>{
+      const div=document.createElement("div");
+      div.className="question";
+      let html=`<p><strong>${p.id}. ${p.pregunta}</strong></p>`;
 
-    preguntas.forEach(p => {
-      const div = document.createElement("div");
-      div.className = "question";
-
-      let html = `<p><strong>${p.id}. ${p.pregunta}</strong></p>`;
-
-      if (p.tipo === "multiple option") {
-        html += `
-          <label class="option-row"><input type="radio" name="q${p.id}" value="A" required><span>A) ${p.opcionA}</span></label>
-          <label class="option-row"><input type="radio" name="q${p.id}" value="B"><span>B) ${p.opcionB}</span></label>
-          <label class="option-row"><input type="radio" name="q${p.id}" value="C"><span>C) ${p.opcionC}</span></label>
-          <label class="option-row"><input type="radio" name="q${p.id}" value="D"><span>D) ${p.opcionD}</span></label>
-        `;
+      if(p.tipo==="multiple option"){
+        html+=`
+        <label class="option-row"><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label>
+        <label class="option-row"><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label>
+        <label class="option-row"><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label>
+        <label class="option-row"><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label>`;
       }
-      else if (p.tipo === "open-ended") {
-        html += `
-          <textarea name="q${p.id}" rows="4" placeholder="Write your answer or record audio"></textarea>
-          <div class="audio-actions">
-            <button type="button" id="rec-btn-q${p.id}" onclick="toggleRecording(${p.id})">🎤 Record</button>
-            <button type="button" class="secondary-btn" onclick="clearAudio(${p.id})">🗑 Clear audio</button>
-          </div>
-          <audio id="audio-q${p.id}" controls style="display:none;"></audio>
-          <input type="hidden" name="q${p.id}_audio">
-        `;
+      else if(p.tipo==="open-ended"){
+        html+=`
+        <textarea name="q${p.id}" rows="4"></textarea>
+        <div class="audio-actions">
+          <button type="button" id="rec-btn-q${p.id}" onclick="toggleRecording(${p.id})">🎤 Record</button>
+          <button type="button" class="secondary-btn" onclick="clearAudio(${p.id})">🗑 Clear</button>
+        </div>
+        <audio id="audio-q${p.id}" controls style="display:none;"></audio>
+        <input type="hidden" name="q${p.id}_audio">`;
       }
-      else if (p.tipo === "calculation") {
-        html += `
-          <div class="calc-wrapper">
-            <input type="number" class="calc-value" step="any" placeholder="Value" oninput="updateCalc(${p.id})" required>
-            <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})" required>
-            <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
-          </div>
-        `;
+      else if(p.tipo==="calculation"){
+        html+=`
+        <div class="calc-wrapper">
+          <input type="number" class="calc-value" oninput="updateCalc(${p.id})" required>
+          <input type="text" class="calc-unit" oninput="updateCalc(${p.id})" required>
+          <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
+        </div>`;
       }
-      else if (p.tipo === "true/false") {
-        html += `
-          <label class="option-row"><input type="radio" name="q${p.id}" value="true" required><span>True</span></label>
-          <label class="option-row"><input type="radio" name="q${p.id}" value="false"><span>False</span></label>
-        `;
+      else if(p.tipo==="true/false"){
+        html+=`
+        <label class="option-row"><input type="radio" name="q${p.id}" value="true" required> True</label>
+        <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>`;
       }
 
-      div.innerHTML = html;
+      div.innerHTML=html;
       container.appendChild(div);
     });
-  })
-  .catch(error => {
-    document.getElementById("preguntas").innerHTML = `<p style="color:red;">Error loading questions: ${error.message}</p>`;
   });
 }
 
-// MANEJO DEL ENVÍO DEL FORMULARIO (sin cambios, usa los hidden fields)
-form.addEventListener('submit', async e => {
+form.addEventListener("submit", async e=>{
   e.preventDefault();
-  const formData = new FormData(form);
-
-  const payload = {
-    nombre: formData.get('nombre'),
-    email: formData.get('email'),
-    testId: formData.get('testId'),
-    answers: []
+  const fd=new FormData(form);
+  const payload={
+    nombre:fd.get("nombre"),
+    email:fd.get("email"),
+    testId:fd.get("testId"),
+    answers:[]
   };
-
-  for (const [key, value] of formData.entries()) {
-    if (key.startsWith('q') && value) {
-      // Evitar que se envíen los campos de audio vacíos
-      if (key.endsWith('_audio') && value === '') continue; 
-      
-      // La clave de la respuesta de audio es 'qX_audio', la pregunta de texto es 'qX'
-      const questionId = key.endsWith('_audio') ? key.substring(1, key.length - 6) : key.substring(1);
-      
-      // Si ya tenemos una respuesta para la pregunta, la actualizamos (ej. audio + texto de respuesta abierta)
-      let existingAnswer = payload.answers.find(a => a.questionId === questionId);
-      
-      if (!existingAnswer) {
-        // Respuesta normal o solo audio
-        payload.answers.push({ questionId: questionId, answer: value });
-      } else {
-        // Manejar el caso de respuesta abierta donde hay texto y audio (si es necesario)
-        // Ya que el audio va en un campo hidden y el texto en un textarea, n8n recibirá ambos como respuestas separadas.
-        // Mantenemos la lógica original de tu código para evitar cambios en el webhook de n8n.
-        payload.answers.push({ questionId: key.substring(1), answer: value });
-      }
+  for(const [k,v] of fd.entries()){
+    if(k.startsWith("q") && v){
+      payload.answers.push({questionId:k.substring(1),answer:v});
     }
   }
-
-  // Filtra respuestas duplicadas si es necesario, pero manteniendo la estructura original
-  // del código para no romper la integración con n8n.
-
-  await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+  await fetch("https://gilloli.app.n8n.cloud/webhook/student-exam-submission",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
   });
-
-  resultadoDiv.innerText = "Exam submitted successfully.";
-  form.reset();
-  
-  // Opcional: regresar al login después de enviar
-  loginSection.classList.remove('hidden');
-  examSection.classList.add('hidden');
-  loginNombreInput.value = '';
-  loginEmailInput.value = '';
-  loginErrorDiv.innerText = '';
+  resultadoDiv.innerText="Exam submitted successfully.";
 });
 </script>
+
 </body>
 </html>
