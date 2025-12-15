@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -62,19 +61,13 @@
       margin-top: 15px;
     }
 
-    button:hover {
-      background: #1e4ed8;
-    }
-
     .secondary-btn {
       background: #f1f5f9;
       color: #0f172a;
       border: 1px solid #cbd5e1;
     }
 
-    .hidden {
-      display: none;
-    }
+    .hidden { display: none; }
 
     .error {
       color: #dc2626;
@@ -82,9 +75,7 @@
       text-align: center;
     }
 
-    .question {
-      margin-bottom: 26px;
-    }
+    .question { margin-bottom: 26px; }
 
     .option-row {
       display: flex;
@@ -101,25 +92,16 @@
       margin-bottom: 6px;
     }
 
-    audio {
-      width: 100%;
-      margin-top: 6px;
-    }
+    audio { width: 100%; margin-top: 6px; }
 
     .calc-wrapper {
       display: flex;
       gap: 12px;
-      align-items: center;
       margin-top: 6px;
     }
 
-    .calc-value {
-      flex: 2;
-    }
-
-    .calc-unit {
-      flex: 1;
-    }
+    .calc-value { flex: 2; }
+    .calc-unit { flex: 1; }
 
     .submit-btn {
       width: 100%;
@@ -135,10 +117,8 @@
 <div class="container" id="loginScreen">
   <div class="card">
     <h2>Student Login</h2>
-
     <input type="text" id="loginUser" placeholder="Student ID">
     <input type="password" id="loginPass" placeholder="Password">
-
     <button type="button" onclick="login()">Login</button>
     <div id="loginError" class="error"></div>
   </div>
@@ -168,7 +148,6 @@
 </div>
 
 <script>
-/* ========= CONFIG ========= */
 const USE_TEST = true;
 
 const LOGIN_URL = USE_TEST
@@ -183,7 +162,6 @@ const resultadoDiv = document.getElementById('resultado');
 let mediaRecorder;
 let audioChunks = {};
 
-/* ========= LOGIN ========= */
 async function login() {
   const user = document.getElementById("loginUser").value.trim();
   const pass = document.getElementById("loginPass").value.trim();
@@ -199,24 +177,20 @@ async function login() {
 
     const data = await res.json();
 
-    if (!res.ok || !data.success) {
-      throw new Error("Login failed");
-    }
+    if (!data.success) throw new Error();
 
-    document.getElementById("studentName").value = data.student.name;
-    document.getElementById("studentEmail").value = data.student.email;
+    document.getElementById("studentName").value = data.student?.name || "";
+    document.getElementById("studentEmail").value = data.student?.email || "";
 
     document.getElementById("loginScreen").classList.add("hidden");
     document.getElementById("examScreen").classList.remove("hidden");
 
     loadQuestions();
-
-  } catch (e) {
+  } catch {
     error.innerText = "Invalid username or password";
   }
 }
 
-/* ========= QUESTIONS ========= */
 function loadQuestions() {
   fetch(questionsUrl)
     .then(res => res.json())
@@ -225,21 +199,20 @@ function loadQuestions() {
       container.innerHTML = "";
 
       preguntas.forEach(p => {
-        const div = document.createElement("div");
-        div.className = "question";
-
-        let html = `<p><strong>${p.id}. ${p.pregunta}</strong></p>`;
+        let html = `<div class="question"><p><strong>${p.id}. ${p.pregunta}</strong></p>`;
 
         if (p.tipo === "multiple option") {
           html += `
-            <label class="option-row"><input type="radio" name="q${p.id}" value="A" required><span>A) ${p.opcionA}</span></label>
-            <label class="option-row"><input type="radio" name="q${p.id}" value="B"><span>B) ${p.opcionB}</span></label>
-            <label class="option-row"><input type="radio" name="q${p.id}" value="C"><span>C) ${p.opcionC}</span></label>
-            <label class="option-row"><input type="radio" name="q${p.id}" value="D"><span>D) ${p.opcionD}</span></label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label>
           `;
-        } else if (p.tipo === "open-ended") {
+        }
+
+        if (p.tipo === "open-ended") {
           html += `
-            <textarea name="q${p.id}" rows="4"></textarea>
+            <textarea name="q${p.id}" rows="4" placeholder="Write your answer or record audio"></textarea>
             <div class="audio-actions">
               <button type="button" id="rec-btn-q${p.id}" onclick="toggleRecording(${p.id})">🎤 Record</button>
               <button type="button" class="secondary-btn" onclick="clearAudio(${p.id})">🗑 Clear audio</button>
@@ -247,28 +220,31 @@ function loadQuestions() {
             <audio id="audio-q${p.id}" controls style="display:none;"></audio>
             <input type="hidden" name="q${p.id}_audio">
           `;
-        } else if (p.tipo === "calculation") {
+        }
+
+        if (p.tipo === "calculation") {
           html += `
             <div class="calc-wrapper">
-              <input type="number" class="calc-value" step="any" oninput="updateCalc(${p.id})" required>
-              <input type="text" class="calc-unit" oninput="updateCalc(${p.id})" required>
+              <input type="number" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})" required>
+              <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})" required>
               <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
             </div>
           `;
-        } else if (p.tipo === "true/false") {
+        }
+
+        if (p.tipo === "true/false") {
           html += `
-            <label class="option-row"><input type="radio" name="q${p.id}" value="true" required><span>True</span></label>
-            <label class="option-row"><input type="radio" name="q${p.id}" value="false"><span>False</span></label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="true" required> True</label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>
           `;
         }
 
-        div.innerHTML = html;
-        container.appendChild(div);
+        html += `</div>`;
+        container.insertAdjacentHTML("beforeend", html);
       });
     });
 }
 
-/* ========= AUDIO ========= */
 async function toggleRecording(id) {
   if (!mediaRecorder || mediaRecorder.state === "inactive") {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -308,7 +284,6 @@ function updateCalc(id) {
   document.getElementById(`calc-q${id}`).value = `${value} ${unit}`.trim();
 }
 
-/* ========= SUBMIT ========= */
 form.addEventListener('submit', async e => {
   e.preventDefault();
   const formData = new FormData(form);
