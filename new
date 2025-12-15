@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>TEST</title>
+</head>
+<body>
+  <h1>DRILLING TEST</h1>
+
+  <form id="examForm">
+    <label>Name:<br>
+      <input type="text" name="nombre" required />
+    </label><br /><br />
+
+    <label>Email:<br>
+      <input type="email" name="email" required />
+    </label><br /><br />
+
+    <input type="hidden" name="testId" value="1" />
+
+    <div id="preguntas">Loading questions...</div>
+
+    <button type="submit">Send exam</button>
+  </form>
+
+  <div id="resultado"></div>
+
+  <script>
+    const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+    const form = document.getElementById('examForm');
+    const resultadoDiv = document.getElementById('resultado');
+
+    // ---- AUDIO helpers (solo añadido) ----
+    const recorders = {};      // { [questionId]: MediaRecorder }
+    const audioChunks = {};    // { [questionId]: BlobPart[] }
+    const audioStreams = {};   // { [questionId]: MediaStream }
+
+    async function toggleRecording(questionId) {
+      const btn = document.getElementById(`rec-btn-q${questionId}`);
+      const hidden = document.querySelector(`input[name="q${questionId}_audio"]`);
+      const audioEl = document.getElementById(`audio-q${questionId}`);
+
+      // Si ya está grabando -> parar
+      if (recorders[questionId] && recorders[questionId].state === "recording") {
+        recorders[questionId].stop();
+        btn.textContent = "🎤 Record";
+        return;
+      }
+
+      // Empezar grabación
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioStreams[questionId] = stream;
+
+        const mr = new MediaRecorder(stream);
+        recorders[questionId] = mr;
+        audioChunks[questionId] = [];
+
+        mr.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) audioChunks[questionId].push(e.data);
+        };
+
+        mr.onstop = () => {
+          // Cerrar micrófono
+          if (audioStreams[questionId]) {
+            audioStreams[questionId].getTracks().forEach(t => t.stop());
+            delete audioStreams[questionId];
+          }
+
+          const blob = new Blob(audioChunks[questionId], { type: "audio/webm" });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            // DataURL: "data:audio/webm;base64,...."
+            const dataUrl = reader.result;
+
+            // Guardar en hidden para enviar a n8n
+            hidden.value = dataUrl;
+
+            // Mostrar preview
+            audioEl.src = dataUrl;
+            audioEl.style.display = "block";
+          };
+          reader.readAsDataURL(blob);
+        };
+
+        mr.start();
+        btn.textContent = "⏹ Stop";
+      } catch (err) {
+        console.error(err);
+        alert("No se pudo acceder al micrófono. Revisa permisos del navegador.");
+      }
+    }
+
+    function clearAudio(questionId) {
+      const hidden = document.querySelector(`input[name="q${questionId}_audio"]`);
+      const audioEl = document.getElementById(`audio-q${questionId}`);
+      hidden.value = "";
+      audioEl.removeAttribute("src");
+      audioEl.style.display = "none";
+    }
+    // ---- FIN AUDIO helpers ----
+
+    // Cargar preguntas y mostrarlas (Esta parte no se modifica)
+    fetch(questionsUrl)
+      .then(res => res.json())
+      .then(preguntas => {
+        const container = document.getElementById("preguntas");
+        container.innerHTML = "";
+
+        preguntas.forEach(p => {
+          const tipo = (p.tipo || "").toLowerCase();
+          const div = document.createElement("div");
+          let html = `<p>${p.id}. ${p.pregunta}</p>`;
+
+          if (tipo === "multiple option") {
+            html += `
+              <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br>
+              <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br>
+              <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br>
+              <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br>
+            `;
+          } else if (tipo === "open-ended") {
+            // Añadido: audio opcional sin cambiar tu flujo
+            html += `
+              <textarea name="q${p.id}" rows="4" cols="60" required></textarea><br>
+
+              <button type="button" id="rec-btn-q${p.id}" onclick="toggleRecording(${p.id})">🎤 Record</button>
+              <button type="button" onclick="clearAudio(${p.id})">🗑️ Clear audio</button><br>
+
+              <audio id="audio-q${p.id}" controls style="display:none; margin-top:6px;"></audio>
+
+              <input type="hidden" name="q${p.id}_audio" value="" />
+            `;
+          } else if (tipo === "true/false") {
+            html += `
+              <label><input type="radio" name="q${p.id}" value="true" required> True</label><br>
+              <label><input type="radio" name="q${p.id}" value="false"> False</label><br>
+            `;
+          } else if (tipo === "calculation") {
+            html += `<input type="number" name="q${p.id}" step="any" required>`;
+          } else {
+            html += `<input type="text" name="q${p.id}" required>`;
+          }
+
+          div.innerHTML = html;
+          container.appendChild(div);
+          container.appendChild(document.createElement("br"));
+        });
+      })
+      .catch(err => {
+        document.getElementById("preguntas").innerText = "Error al cargar preguntas.";
+        console.error(err);
+      });
+
+    // --- CÓDIGO CORREGIDO PARA EL ENVÍO DEL FORMULARIO ---
+    // Capturar el envío del formulario y enviarlo en el formato correcto para n8n
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const formData = new FormData(form);
+
+      // 1. Crear un objeto base para enviar
+      const payload = {
+        nombre: formData.get('nombre'),
+        email: formData.get('email'),
+        testId: formData.get('testId'),
+        answers: [] // 2. Inicializar un array vacío para las respuestas
+      };
+
+      // 3. Recorrer los datos del formulario y poblar el array 'answers'
+      for (const [key, value] of formData.entries()) {
+        if (key.startsWith('q')) {
+          const questionId = key.substring(1); // de 'q1' a '1' o '1_audio'
+          payload.answers.push({
+            questionId: questionId,
+            answer: value
+          });
+        }
+      }
+
+      // 4. Enviar el objeto 'payload' construido a n8n
+      try {
+        resultadoDiv.innerText = "Submitting exam, please wait...";
+
+        const response = await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          resultadoDiv.innerText = "Exam submitted successfully. You will receive your grade by email.";
+          form.reset();
+        } else {
+          const errorText = await response.text();
+          resultadoDiv.innerText = `Error al enviar el examen. Código: ${response.status}`;
+          console.error("Error en la respuesta del webhook:", response.status, errorText);
+        }
+      } catch (error) {
+        resultadoDiv.innerText = "Network error while submitting the exam.";
+        console.error("Error al enviar el formulario:", error);
+      }
+    });
+  </script>
+</body>
+</html>
