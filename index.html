@@ -8,8 +8,8 @@
     body {
       margin: 0;
       font-family: "Segoe UI", Roboto, Arial, sans-serif;
-      background: #f4f6f9;
-      color: #333;
+      background: linear-gradient(135deg, #eef2f7, #dbe7f3);
+      color: #1f2937;
     }
 
     .container {
@@ -19,28 +19,30 @@
     }
 
     .card {
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-      padding: 30px;
+      background: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      padding: 35px;
     }
 
     h1, h2 {
       margin-top: 0;
-      color: #1f2937;
+      color: #0f172a;
     }
 
     label {
-      font-weight: 500;
+      font-weight: 600;
+      margin-top: 12px;
+      display: block;
     }
 
-    input, textarea, button {
+    input, textarea {
       width: 100%;
       margin-top: 6px;
-      padding: 10px;
+      padding: 10px 12px;
       font-size: 15px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
     }
 
     textarea {
@@ -49,10 +51,13 @@
 
     button {
       background: #2563eb;
-      color: white;
+      color: #fff;
       border: none;
+      border-radius: 6px;
+      padding: 10px 18px;
+      font-size: 15px;
       cursor: pointer;
-      margin-top: 15px;
+      transition: background 0.2s ease;
     }
 
     button:hover {
@@ -60,13 +65,13 @@
     }
 
     .secondary-btn {
-      background: #e5e7eb;
-      color: #111;
-      margin-top: 8px;
+      background: #f1f5f9;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
     }
 
     .secondary-btn:hover {
-      background: #d1d5db;
+      background: #e2e8f0;
     }
 
     .hidden {
@@ -74,14 +79,28 @@
     }
 
     .question {
-      margin-bottom: 30px;
+      margin-bottom: 28px;
     }
 
-    .audio-controls button {
-      width: auto;
-      margin-right: 10px;
-      padding: 6px 12px;
+    .open-question textarea {
+      border: 1px solid #94a3b8;
+    }
+
+    .audio-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      margin-bottom: 6px;
+    }
+
+    .audio-actions button {
+      padding: 7px 14px;
       font-size: 14px;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 6px;
     }
 
     .header {
@@ -90,64 +109,173 @@
     }
 
     .header small {
-      color: #6b7280;
+      color: #475569;
+    }
+
+    .submit-btn {
+      margin-top: 25px;
+      width: 100%;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
 
-  <!-- LOGIN -->
-  <div class="container" id="loginSection">
+  <div class="container">
     <div class="card">
       <div class="header">
-        <h1>Student Examination Portal</h1>
-        <small>Authorized access only</small>
+        <h1>DRILLING TEST</h1>
+        <small>Official Student Examination</small>
       </div>
 
-      <label>Username</label>
-      <input type="text" id="username" required>
-
-      <label>Password</label>
-      <input type="password" id="password" required>
-
-      <button onclick="enterExam()">Login</button>
-    </div>
-  </div>
-
-  <!-- EXAMEN (TU CÓDIGO ORIGINAL) -->
-  <div class="container hidden" id="examSection">
-    <div class="card">
-      <h2>DRILLING TEST</h2>
-
       <form id="examForm">
-        <label>Name:</label>
+        <label>Name</label>
         <input type="text" name="nombre" required>
 
-        <label>Email:</label>
+        <label>Email</label>
         <input type="email" name="email" required>
 
         <input type="hidden" name="testId" value="1">
 
         <div id="preguntas">Loading questions...</div>
 
-        <button type="submit">Submit Exam</button>
+        <button type="submit" class="submit-btn">Submit Exam</button>
       </form>
 
       <div id="resultado"></div>
     </div>
   </div>
 
-  <!-- TU JAVASCRIPT FUNCIONAL (NO SE TOCA) -->
   <script>
-    function enterExam() {
-      document.getElementById("loginSection").classList.add("hidden");
-      document.getElementById("examSection").classList.remove("hidden");
+    const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+    const form = document.getElementById('examForm');
+    const resultadoDiv = document.getElementById('resultado');
+
+    let mediaRecorder;
+    let audioChunks = {};
+
+    async function toggleRecording(id) {
+      if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks[id] = [];
+
+        mediaRecorder.ondataavailable = e => audioChunks[id].push(e.data);
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunks[id], { type: "audio/webm" });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            document.querySelector(`input[name="q${id}_audio"]`).value = reader.result;
+            const audio = document.getElementById(`audio-q${id}`);
+            audio.src = reader.result;
+            audio.style.display = "block";
+          };
+          reader.readAsDataURL(blob);
+        };
+
+        mediaRecorder.start();
+        document.getElementById(`rec-btn-q${id}`).innerText = "⏹ Stop";
+      } else {
+        mediaRecorder.stop();
+        document.getElementById(`rec-btn-q${id}`).innerText = "🎤 Record";
+      }
     }
+
+    function clearAudio(id) {
+      document.querySelector(`input[name="q${id}_audio"]`).value = "";
+      const audio = document.getElementById(`audio-q${id}`);
+      audio.src = "";
+      audio.style.display = "none";
+    }
+
+    fetch(questionsUrl)
+      .then(res => res.json())
+      .then(preguntas => {
+        const container = document.getElementById("preguntas");
+        container.innerHTML = "";
+
+        preguntas.forEach(p => {
+          const tipo = p.tipo;
+          const div = document.createElement("div");
+          div.className = "question";
+
+          let html = `<p><strong>${p.id}. ${p.pregunta}</strong></p>`;
+
+          if (tipo === "multiple option") {
+            html += `
+              <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br>
+              <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br>
+              <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br>
+              <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label>
+            `;
+          } 
+          else if (tipo === "open-ended") {
+            html += `
+              <div class="open-question">
+                <textarea name="q${p.id}" rows="4"
+                  placeholder="Write your answer or record audio"></textarea>
+
+                <div class="audio-actions">
+                  <button type="button" id="rec-btn-q${p.id}"
+                    onclick="toggleRecording(${p.id})">🎤 Record</button>
+
+                  <button type="button" class="secondary-btn"
+                    onclick="clearAudio(${p.id})">🗑 Clear audio</button>
+                </div>
+
+                <audio id="audio-q${p.id}" controls style="display:none;"></audio>
+                <input type="hidden" name="q${p.id}_audio" />
+              </div>
+            `;
+          }
+          else if (tipo === "true/false") {
+            html += `
+              <label><input type="radio" name="q${p.id}" value="true" required> True</label><br>
+              <label><input type="radio" name="q${p.id}" value="false"> False</label>
+            `;
+          }
+          else if (tipo === "calculation") {
+            html += `<input type="number" name="q${p.id}" step="any" required>`;
+          }
+          else {
+            html += `<input type="text" name="q${p.id}" required>`;
+          }
+
+          div.innerHTML = html;
+          container.appendChild(div);
+        });
+      });
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const formData = new FormData(form);
+
+      const payload = {
+        nombre: formData.get('nombre'),
+        email: formData.get('email'),
+        testId: formData.get('testId'),
+        answers: []
+      };
+
+      for (const [key, value] of formData.entries()) {
+        if (key.startsWith('q') && value) {
+          payload.answers.push({
+            questionId: key.substring(1),
+            answer: value
+          });
+        }
+      }
+
+      await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      resultadoDiv.innerText = "Exam submitted successfully.";
+      form.reset();
+    });
   </script>
-
-  <!-- AQUÍ VA EXACTAMENTE TU SCRIPT ACTUAL -->
-  <!-- 🔴 NO LO CAMBIO 🔴 -->
-  <!-- 🔴 EL DE FETCH, AUDIO, SUBMIT, ETC 🔴 -->
-
 </body>
 </html>
