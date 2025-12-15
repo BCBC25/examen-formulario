@@ -30,59 +30,40 @@
     const form = document.getElementById('examForm');
     const resultadoDiv = document.getElementById('resultado');
 
-    // ---- AUDIO HELPERS ----
-    const recorders = {};
-    const audioChunks = {};
-    const audioStreams = {};
+    // ===== AUDIO (AÑADIDO, NO TOCA N8N) =====
+    let mediaRecorder;
+    let audioChunks = {};
 
-    async function toggleRecording(questionId) {
-      const btn = document.getElementById(`rec-btn-q${questionId}`);
-      const hidden = document.querySelector(`input[name="q${questionId}_audio"]`);
-      const audioEl = document.getElementById(`audio-q${questionId}`);
+    async function toggleRecording(id) {
+      if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks[id] = [];
 
-      if (recorders[questionId]?.state === "recording") {
-        recorders[questionId].stop();
-        btn.textContent = "🎤 Record";
-        return;
-      }
+        mediaRecorder.ondataavailable = e => audioChunks[id].push(e.data);
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStreams[questionId] = stream;
-
-      const mr = new MediaRecorder(stream);
-      recorders[questionId] = mr;
-      audioChunks[questionId] = [];
-
-      mr.ondataavailable = e => e.data.size && audioChunks[questionId].push(e.data);
-
-      mr.onstop = () => {
-        audioStreams[questionId]?.getTracks().forEach(t => t.stop());
-
-        const blob = new Blob(audioChunks[questionId], { type: "audio/webm" });
-        const reader = new FileReader();
-
-        reader.onloadend = () => {
-          hidden.value = reader.result;
-          audioEl.src = reader.result;
-          audioEl.style.display = "block";
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunks[id], { type: "audio/webm" });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            document.querySelector(`input[name="q${id}_audio"]`).value = reader.result;
+            const audio = document.getElementById(`audio-q${id}`);
+            audio.src = reader.result;
+            audio.style.display = "block";
+          };
+          reader.readAsDataURL(blob);
         };
 
-        reader.readAsDataURL(blob);
-      };
-
-      mr.start();
-      btn.textContent = "⏹ Stop";
+        mediaRecorder.start();
+        document.getElementById(`rec-btn-q${id}`).innerText = "⏹ Stop";
+      } else {
+        mediaRecorder.stop();
+        document.getElementById(`rec-btn-q${id}`).innerText = "🎤 Record";
+      }
     }
+    // ===== FIN AUDIO =====
 
-    function clearAudio(questionId) {
-      document.querySelector(`input[name="q${questionId}_audio"]`).value = "";
-      const audioEl = document.getElementById(`audio-q${questionId}`);
-      audioEl.src = "";
-      audioEl.style.display = "none";
-    }
-    // ---- END AUDIO HELPERS ----
-
-    // Cargar preguntas
+    // Cargar preguntas (MISMA LÓGICA ORIGINAL)
     fetch(questionsUrl)
       .then(res => res.json())
       .then(preguntas => {
@@ -90,57 +71,46 @@
         container.innerHTML = "";
 
         preguntas.forEach(p => {
-          const tipo = (p.tipo || "")
-            .toLowerCase()
-            .trim()
-            .replace("_", "-");
-
+          const tipo = p.tipo; // 👈 EXACTAMENTE COMO ANTES
           const div = document.createElement("div");
           let html = `<p>${p.id}. ${p.pregunta}</p>`;
 
-          if (tipo.includes("multiple")) {
+          if (tipo === "multiple option") {
             html += `
               <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br>
               <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br>
               <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br>
               <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br>
             `;
-          } else if (tipo.includes("open")) {
+          } else if (tipo === "open-ended") {
             html += `
-              <textarea name="q${p.id}" rows="4" cols="60"
-                placeholder="Write your answer or record audio"></textarea><br>
+              <textarea name="q${p.id}" rows="4" cols="60"></textarea><br>
 
               <button type="button" id="rec-btn-q${p.id}"
-                onclick="toggleRecording(${p.id})">🎤 Record</button>
+                onclick="toggleRecording(${p.id})">🎤 Record</button><br>
 
-              <button type="button" onclick="clearAudio(${p.id})">🗑 Clear audio</button><br>
-
-              <audio id="audio-q${p.id}" controls style="display:none; margin-top:6px;"></audio>
+              <audio id="audio-q${p.id}" controls style="display:none;"></audio>
 
               <input type="hidden" name="q${p.id}_audio" />
             `;
-          } else if (tipo.includes("true")) {
+          } else if (tipo === "true/false") {
             html += `
               <label><input type="radio" name="q${p.id}" value="true" required> True</label><br>
               <label><input type="radio" name="q${p.id}" value="false"> False</label><br>
             `;
-          } else if (tipo.includes("calc")) {
+          } else if (tipo === "calculation") {
             html += `<input type="number" name="q${p.id}" step="any" required>`;
           } else {
-            html += `<input type="text" name="q${p.id}">`;
+            html += `<input type="text" name="q${p.id}" required>`;
           }
 
           div.innerHTML = html;
           container.appendChild(div);
           container.appendChild(document.createElement("br"));
         });
-      })
-      .catch(err => {
-        document.getElementById("preguntas").innerText = "Error loading questions.";
-        console.error(err);
       });
 
-    // Envío del formulario (SIN CAMBIOS)
+    // ENVÍO (100% IGUAL AL ORIGINAL)
     form.addEventListener('submit', async e => {
       e.preventDefault();
       const formData = new FormData(form);
@@ -161,24 +131,14 @@
         }
       }
 
-      try {
-        resultadoDiv.innerText = "Submitting exam...";
-        const res = await fetch(
-          'https://gilloli.app.n8n.cloud/webhook/student-exam-submission',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          }
-        );
+      await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-        resultadoDiv.innerText = res.ok
-          ? "Exam submitted successfully."
-          : "Error submitting exam.";
-      } catch (err) {
-        resultadoDiv.innerText = "Network error.";
-        console.error(err);
-      }
+      resultadoDiv.innerText = "Exam submitted successfully.";
+      form.reset();
     });
   </script>
 </body>
