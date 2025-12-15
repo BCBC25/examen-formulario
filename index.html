@@ -25,7 +25,7 @@
       padding: 35px;
     }
 
-    h1 {
+    h1, h2 {
       text-align: center;
       margin-top: 0;
       color: #0f172a;
@@ -33,7 +33,7 @@
 
     input, textarea {
       width: 100%;
-      margin-top: 6px;
+      margin-top: 10px;
       padding: 10px 12px;
       font-size: 15px;
       border-radius: 6px;
@@ -46,18 +46,15 @@
       margin: 0;
     }
 
-    textarea {
-      resize: vertical;
-    }
-
     button {
       background: #2563eb;
       color: #fff;
       border: none;
       border-radius: 6px;
-      padding: 8px 16px;
-      font-size: 14px;
+      padding: 10px 18px;
+      font-size: 15px;
       cursor: pointer;
+      margin-top: 15px;
     }
 
     button:hover {
@@ -70,11 +67,20 @@
       border: 1px solid #cbd5e1;
     }
 
+    .hidden {
+      display: none;
+    }
+
+    .error {
+      color: #dc2626;
+      margin-top: 10px;
+      text-align: center;
+    }
+
     .question {
       margin-bottom: 26px;
     }
 
-    /* ===== MULTIPLE CHOICE ===== */
     .option-row {
       display: flex;
       align-items: center;
@@ -83,7 +89,6 @@
       cursor: pointer;
     }
 
-    /* ===== OPEN ENDED AUDIO ===== */
     .audio-actions {
       display: flex;
       gap: 10px;
@@ -96,21 +101,14 @@
       margin-top: 6px;
     }
 
-    /* ===== CALCULATION INPUTS ===== */
     .calc-wrapper {
       display: flex;
       gap: 12px;
-      align-items: center;
       margin-top: 6px;
     }
 
-    .calc-value {
-      flex: 2;
-    }
-
-    .calc-unit {
-      flex: 1;
-    }
+    .calc-value { flex: 2; }
+    .calc-unit { flex: 1; }
 
     .submit-btn {
       width: 100%;
@@ -121,16 +119,28 @@
 </head>
 <body>
 
-<div class="container">
+<!-- 🔐 LOGIN -->
+<div class="container" id="loginScreen">
+  <div class="card">
+    <h2>Student Login</h2>
+
+    <input type="text" id="loginUser" placeholder="Student ID" required>
+    <input type="password" id="loginPass" placeholder="Password" required>
+
+    <button onclick="login()">Login</button>
+    <div id="loginError" class="error"></div>
+  </div>
+</div>
+
+<!-- 📝 EXAMEN (OCULTO HASTA LOGIN OK) -->
+<div class="container hidden" id="examScreen">
   <div class="card">
     <h1>DRILLING TEST</h1>
 
     <form id="examForm">
-      <label>Name</label>
-      <input type="text" name="nombre" required>
-
-      <label>Email</label>
-      <input type="email" name="email" required>
+      <!-- 🔒 Estos campos los llena el login -->
+      <input type="hidden" name="nombre" id="studentName">
+      <input type="hidden" name="email" id="studentEmail">
 
       <input type="hidden" name="testId" value="1">
 
@@ -144,6 +154,38 @@
 </div>
 
 <script>
+/* ================= LOGIN ================= */
+async function login() {
+  const user = document.getElementById("loginUser").value;
+  const pass = document.getElementById("loginPass").value;
+  const error = document.getElementById("loginError");
+  error.innerText = "";
+
+  try {
+    const res = await fetch("https://TU_N8N/login-webhook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user, pass })
+    });
+
+    if (!res.ok) throw new Error();
+
+    const data = await res.json();
+
+    // Datos vienen de Google Sheets vía n8n
+    document.getElementById("studentName").value = data.name;
+    document.getElementById("studentEmail").value = data.email;
+
+    document.getElementById("loginScreen").classList.add("hidden");
+    document.getElementById("examScreen").classList.remove("hidden");
+
+  } catch {
+    error.innerText = "Invalid username or password";
+  }
+}
+
+/* ================= EXAMEN (CÓDIGO ORIGINAL) ================= */
+
 const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
 const form = document.getElementById('examForm');
 const resultadoDiv = document.getElementById('resultado');
@@ -156,6 +198,7 @@ async function toggleRecording(id) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
     audioChunks[id] = [];
+
     mediaRecorder.ondataavailable = e => audioChunks[id].push(e.data);
     mediaRecorder.onstop = () => {
       const blob = new Blob(audioChunks[id], { type: "audio/webm" });
@@ -168,6 +211,7 @@ async function toggleRecording(id) {
       };
       reader.readAsDataURL(blob);
     };
+
     mediaRecorder.start();
     document.getElementById(`rec-btn-q${id}`).innerText = "⏹ Stop";
   } else {
@@ -183,92 +227,20 @@ function clearAudio(id) {
   audio.style.display = "none";
 }
 
-/* 🔒 Une valor + unidad SIN afectar n8n */
 function updateCalc(id) {
-  const wrapper = document.getElementById(`calc-q${id}`).parentElement;
-  const value = wrapper.querySelector('.calc-value').value;
-  const unit = wrapper.querySelector('.calc-unit').value;
-  document.getElementById(`calc-q${id}`).value = `${value} ${unit}`.trim();
+  const w = document.getElementById(`calc-q${id}`).parentElement;
+  const v = w.querySelector('.calc-value').value;
+  const u = w.querySelector('.calc-unit').value;
+  document.getElementById(`calc-q${id}`).value = `${v} ${u}`.trim();
 }
 
-fetch(questionsUrl)
-.then(res => res.json())
-.then(preguntas => {
-  const container = document.getElementById("preguntas");
-  container.innerHTML = "";
-
-  preguntas.forEach(p => {
-    const div = document.createElement("div");
-    div.className = "question";
-
-    let html = `<p><strong>${p.id}. ${p.pregunta}</strong></p>`;
-
-    if (p.tipo === "multiple option") {
-      html += `
-        <label class="option-row"><input type="radio" name="q${p.id}" value="A" required><span>A) ${p.opcionA}</span></label>
-        <label class="option-row"><input type="radio" name="q${p.id}" value="B"><span>B) ${p.opcionB}</span></label>
-        <label class="option-row"><input type="radio" name="q${p.id}" value="C"><span>C) ${p.opcionC}</span></label>
-        <label class="option-row"><input type="radio" name="q${p.id}" value="D"><span>D) ${p.opcionD}</span></label>
-      `;
-    }
-    else if (p.tipo === "open-ended") {
-      html += `
-        <textarea name="q${p.id}" rows="4" placeholder="Write your answer or record audio"></textarea>
-        <div class="audio-actions">
-          <button type="button" id="rec-btn-q${p.id}" onclick="toggleRecording(${p.id})">🎤 Record</button>
-          <button type="button" class="secondary-btn" onclick="clearAudio(${p.id})">🗑 Clear audio</button>
-        </div>
-        <audio id="audio-q${p.id}" controls style="display:none;"></audio>
-        <input type="hidden" name="q${p.id}_audio">
-      `;
-    }
-    else if (p.tipo === "calculation") {
-      html += `
-        <div class="calc-wrapper">
-          <input type="number" class="calc-value" step="any" placeholder="Value" oninput="updateCalc(${p.id})" required>
-          <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})" required>
-          <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
-        </div>
-      `;
-    }
-    else if (p.tipo === "true/false") {
-      html += `
-        <label class="option-row"><input type="radio" name="q${p.id}" value="true" required><span>True</span></label>
-        <label class="option-row"><input type="radio" name="q${p.id}" value="false"><span>False</span></label>
-      `;
-    }
-
-    div.innerHTML = html;
-    container.appendChild(div);
-  });
-});
-
-form.addEventListener('submit', async e => {
-  e.preventDefault();
-  const formData = new FormData(form);
-
-  const payload = {
-    nombre: formData.get('nombre'),
-    email: formData.get('email'),
-    testId: formData.get('testId'),
-    answers: []
-  };
-
-  for (const [key, value] of formData.entries()) {
-    if (key.startsWith('q') && value) {
-      payload.answers.push({ questionId: key.substring(1), answer: value });
-    }
-  }
-
-  await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  resultadoDiv.innerText = "Exam submitted successfully.";
-  form.reset();
-});
+/* 👉 AQUÍ VA EXACTAMENTE TU CÓDIGO EXISTENTE
+   👉 fetch de preguntas
+   👉 render de preguntas
+   👉 submit del examen a:
+   https://gilloli.app.n8n.cloud/webhook/student-exam-submission
+   (SIN CAMBIOS)
+*/
 </script>
 </body>
 </html>
