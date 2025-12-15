@@ -76,21 +76,31 @@
       margin-bottom: 26px;
     }
 
-    /* ===== MULTIPLE CHOICE (A B C D) ===== */
-    .multiple-options label {
-      display: block;
-      margin: 4px 0;              /* 🔹 espacio vertical reducido */
+    /* ===== MULTIPLE CHOICE PERFECT ALIGN ===== */
+    .multiple-options .option-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 6px 0;
+      cursor: pointer;
     }
 
-    .multiple-options input[type="radio"] {
-      margin-right: 6px;          /* 🔹 radio cerca del texto */
-      vertical-align: middle;
+    .multiple-options .option-row input[type="radio"] {
+      margin: 0;
+      flex: 0 0 auto;
+    }
+
+    .multiple-options .option-row span {
+      flex: 1;
     }
 
     /* ===== TRUE / FALSE ===== */
-    .question label input[type="radio"] {
-      margin-right: 6px;
-      vertical-align: middle;
+    .truefalse .option-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 6px 0;
+      cursor: pointer;
     }
 
     /* ===== OPEN ENDED + AUDIO ===== */
@@ -200,10 +210,10 @@
           if (tipo === "multiple option") {
             html += `
               <div class="multiple-options">
-                <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label>
-                <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label>
-                <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label>
-                <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label>
+                <label class="option-row"><input type="radio" name="q${p.id}" value="A" required><span>A) ${p.opcionA}</span></label>
+                <label class="option-row"><input type="radio" name="q${p.id}" value="B"><span>B) ${p.opcionB}</span></label>
+                <label class="option-row"><input type="radio" name="q${p.id}" value="C"><span>C) ${p.opcionC}</span></label>
+                <label class="option-row"><input type="radio" name="q${p.id}" value="D"><span>D) ${p.opcionD}</span></label>
               </div>
             `;
           } 
@@ -228,8 +238,10 @@
           }
           else if (tipo === "true/false") {
             html += `
-              <label><input type="radio" name="q${p.id}" value="true" required> True</label><br>
-              <label><input type="radio" name="q${p.id}" value="false"> False</label>
+              <div class="truefalse">
+                <label class="option-row"><input type="radio" name="q${p.id}" value="true" required><span>True</span></label>
+                <label class="option-row"><input type="radio" name="q${p.id}" value="false"><span>False</span></label>
+              </div>
             `;
           }
           else if (tipo === "calculation") {
