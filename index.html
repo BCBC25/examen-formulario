@@ -31,19 +31,13 @@
       color: #0f172a;
     }
 
-    input, textarea {
+    input {
       width: 100%;
       margin-top: 10px;
       padding: 10px 12px;
       font-size: 15px;
       border-radius: 6px;
       border: 1px solid #cbd5e1;
-      box-sizing: border-box;
-    }
-
-    input[type="radio"] {
-      width: auto !important;
-      margin: 0;
     }
 
     button {
@@ -57,102 +51,86 @@
       margin-top: 15px;
     }
 
-    button:hover {
-      background: #1e4ed8;
-    }
-
-    .hidden {
-      display: none;
-    }
+    .hidden { display: none; }
 
     .error {
       color: #dc2626;
       margin-top: 10px;
       text-align: center;
     }
-
-    .submit-btn {
-      width: 100%;
-      margin-top: 25px;
-      font-size: 16px;
-    }
   </style>
 </head>
+
 <body>
 
-<!-- 🔐 LOGIN -->
+<!-- LOGIN -->
 <div class="container" id="loginScreen">
   <div class="card">
     <h2>Student Login</h2>
 
-    <input type="text" id="loginUser" placeholder="Student ID" required>
-    <input type="password" id="loginPass" placeholder="Password" required>
+    <input type="text" id="loginUser" placeholder="Student ID">
+    <input type="password" id="loginPass" placeholder="Password">
 
-    <button onclick="login()">Login</button>
+    <button type="button" onclick="login()">Login</button>
     <div id="loginError" class="error"></div>
   </div>
 </div>
 
-<!-- 📝 EXAMEN -->
+<!-- EXAM -->
 <div class="container hidden" id="examScreen">
   <div class="card">
     <h1>DRILLING TEST</h1>
 
     <form id="examForm">
-      <!-- 🔒 Datos del estudiante -->
-      <input type="hidden" name="nombre" id="studentName">
-      <input type="hidden" name="email" id="studentEmail">
-      <input type="hidden" name="testId" value="1">
-
-      <div id="preguntas">Loading questions...</div>
-
-      <button type="submit" class="submit-btn">Submit Exam</button>
+      <input type="hidden" id="studentName">
+      <input type="hidden" id="studentEmail">
     </form>
-
-    <div id="resultado"></div>
   </div>
 </div>
 
 <script>
-/* ================= LOGIN ================= */
+/* ========= CONFIG ========= */
+const USE_TEST = true; // 🔴 true = webhook-test | false = webhook (production)
+
+const LOGIN_URL = USE_TEST
+  ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
+  : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
+
+/* ========= LOGIN ========= */
 async function login() {
-  const user = document.getElementById("loginUser").value;
-  const pass = document.getElementById("loginPass").value;
+  const user = document.getElementById("loginUser").value.trim();
+  const pass = document.getElementById("loginPass").value.trim();
   const error = document.getElementById("loginError");
   error.innerText = "";
 
   try {
-    const res = await fetch("https://gilloli.app.n8n.cloud/webhook-test/login-webhook", {
+    const res = await fetch(LOGIN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user, pass })
     });
 
-    if (!res.ok) throw new Error();
+    const raw = await res.text();
+    console.log("RAW RESPONSE:", raw);
 
-    const data = await res.json();
-    if (!data.success) throw new Error();
+    const data = JSON.parse(raw);
 
-    // ✅ DATOS CORRECTOS DESDE n8n
+    if (!res.ok || !data.success) {
+      throw new Error("Login failed");
+    }
+
     document.getElementById("studentName").value = data.student.name;
     document.getElementById("studentEmail").value = data.student.email;
 
     document.getElementById("loginScreen").classList.add("hidden");
     document.getElementById("examScreen").classList.remove("hidden");
 
-  } catch {
+  } catch (e) {
+    console.error(e);
     error.innerText = "Invalid username or password";
   }
 }
-
-/* ================= EXAMEN (SIN CAMBIOS) ================= */
-
-/* 👉 AQUÍ VA EXACTAMENTE TU CÓDIGO EXISTENTE
-   👉 fetch de preguntas
-   👉 render de preguntas
-   👉 submit del examen a:
-   https://gilloli.app.n8n.cloud/webhook/student-exam-submission
-*/
 </script>
+
 </body>
 </html>
