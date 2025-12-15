@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -16,6 +17,7 @@
       max-width: 900px;
       margin: auto;
       padding: 40px 20px;
+      position: relative;
     }
 
     .card {
@@ -31,6 +33,18 @@
       color: #0f172a;
     }
 
+    /* ===== TIMER ===== */
+    #timer {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-weight: 600;
+      color: #2563eb;
+    }
+
+    #timer.warning { color: #d97706; }
+    #timer.danger { color: #dc2626; }
+
     input, textarea {
       width: 100%;
       margin-top: 6px;
@@ -41,14 +55,9 @@
       box-sizing: border-box;
     }
 
-    input[type="radio"] {
-      width: auto !important;
-      margin: 0;
-    }
+    input[type="radio"] { width: auto !important; margin: 0; }
 
-    textarea {
-      resize: vertical;
-    }
+    textarea { resize: vertical; }
 
     button {
       background: #2563eb;
@@ -126,6 +135,8 @@
 
 <!-- EXAM -->
 <div class="container hidden" id="examScreen">
+  <div id="timer">30:00</div>
+
   <div class="card">
     <h1>DRILLING TEST</h1>
 
@@ -149,6 +160,9 @@
 
 <script>
 const USE_TEST = true;
+const EXAM_DURATION = 30 * 60; // 30 minutes in seconds
+let timeLeft = EXAM_DURATION;
+let timerInterval;
 
 const LOGIN_URL = USE_TEST
   ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
@@ -158,15 +172,15 @@ const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6m
 
 const form = document.getElementById('examForm');
 const resultadoDiv = document.getElementById('resultado');
+const timerEl = document.getElementById('timer');
 
 let mediaRecorder;
 let audioChunks = {};
 
 async function login() {
-  const user = document.getElementById("loginUser").value.trim();
-  const pass = document.getElementById("loginPass").value.trim();
-  const error = document.getElementById("loginError");
-  error.innerText = "";
+  const user = loginUser.value.trim();
+  const pass = loginPass.value.trim();
+  loginError.innerText = "";
 
   try {
     const res = await fetch(LOGIN_URL, {
@@ -176,27 +190,62 @@ async function login() {
     });
 
     const data = await res.json();
-
     if (!data.success) throw new Error();
 
-    document.getElementById("studentName").value = data.student?.name || "";
-    document.getElementById("studentEmail").value = data.student?.email || "";
+    studentName.value = data.student?.name || "";
+    studentEmail.value = data.student?.email || "";
 
-    document.getElementById("loginScreen").classList.add("hidden");
-    document.getElementById("examScreen").classList.remove("hidden");
+    loginScreen.classList.add("hidden");
+    examScreen.classList.remove("hidden");
 
     loadQuestions();
+    startTimer();
   } catch {
-    error.innerText = "Invalid username or password";
+    loginError.innerText = "Invalid username or password";
   }
 }
 
+/* ===== TIMER ===== */
+function startTimer() {
+  updateTimer();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimer();
+
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      autoSubmit();
+    }
+  }, 1000);
+}
+
+function updateTimer() {
+  const min = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+  const sec = String(timeLeft % 60).padStart(2, "0");
+  timerEl.textContent = `${min}:${sec}`;
+
+  if (timeLeft <= 300) timerEl.className = "danger";
+  else if (timeLeft <= 600) timerEl.className = "warning";
+}
+
+function autoSubmit() {
+  disableExam();
+  form.dispatchEvent(new Event("submit"));
+}
+
+function disableExam() {
+  document.querySelectorAll("input, textarea, button").forEach(el => {
+    if (el.type !== "hidden") el.disabled = true;
+  });
+}
+
+/* ===== QUESTIONS ===== */
 function loadQuestions() {
   fetch(questionsUrl)
     .then(res => res.json())
     .then(preguntas => {
-      const container = document.getElementById("preguntas");
-      container.innerHTML = "";
+      preguntasDiv = document.getElementById("preguntas");
+      preguntasDiv.innerHTML = "";
 
       preguntas.forEach(p => {
         let html = `<div class="question"><p><strong>${p.id}. ${p.pregunta}</strong></p>`;
@@ -206,20 +255,18 @@ function loadQuestions() {
             <label class="option-row"><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label>
             <label class="option-row"><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label>
             <label class="option-row"><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label>
-            <label class="option-row"><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label>
-          `;
+            <label class="option-row"><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label>`;
         }
 
         if (p.tipo === "open-ended") {
           html += `
             <textarea name="q${p.id}" rows="4" placeholder="Write your answer or record audio"></textarea>
             <div class="audio-actions">
-              <button type="button" id="rec-btn-q${p.id}" onclick="toggleRecording(${p.id})">🎤 Record</button>
+              <button type="button" onclick="toggleRecording(${p.id})">🎤 Record</button>
               <button type="button" class="secondary-btn" onclick="clearAudio(${p.id})">🗑 Clear audio</button>
             </div>
             <audio id="audio-q${p.id}" controls style="display:none;"></audio>
-            <input type="hidden" name="q${p.id}_audio">
-          `;
+            <input type="hidden" name="q${p.id}_audio">`;
         }
 
         if (p.tipo === "calculation") {
@@ -228,23 +275,22 @@ function loadQuestions() {
               <input type="number" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})" required>
               <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})" required>
               <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
-            </div>
-          `;
+            </div>`;
         }
 
         if (p.tipo === "true/false") {
           html += `
             <label class="option-row"><input type="radio" name="q${p.id}" value="true" required> True</label>
-            <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>
-          `;
+            <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>`;
         }
 
         html += `</div>`;
-        container.insertAdjacentHTML("beforeend", html);
+        preguntasDiv.insertAdjacentHTML("beforeend", html);
       });
     });
 }
 
+/* ===== AUDIO & CALC ===== */
 async function toggleRecording(id) {
   if (!mediaRecorder || mediaRecorder.state === "inactive") {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -263,31 +309,30 @@ async function toggleRecording(id) {
       reader.readAsDataURL(blob);
     };
     mediaRecorder.start();
-    document.getElementById(`rec-btn-q${id}`).innerText = "⏹ Stop";
   } else {
     mediaRecorder.stop();
-    document.getElementById(`rec-btn-q${id}`).innerText = "🎤 Record";
   }
 }
 
 function clearAudio(id) {
   document.querySelector(`input[name="q${id}_audio"]`).value = "";
-  const audio = document.getElementById(`audio-q${id}`);
-  audio.src = "";
-  audio.style.display = "none";
+  document.getElementById(`audio-q${id}`).style.display = "none";
 }
 
 function updateCalc(id) {
   const wrapper = document.getElementById(`calc-q${id}`).parentElement;
-  const value = wrapper.querySelector('.calc-value').value;
-  const unit = wrapper.querySelector('.calc-unit').value;
-  document.getElementById(`calc-q${id}`).value = `${value} ${unit}`.trim();
+  document.getElementById(`calc-q${id}`).value =
+    `${wrapper.querySelector('.calc-value').value} ${wrapper.querySelector('.calc-unit').value}`.trim();
 }
 
+/* ===== SUBMIT ===== */
 form.addEventListener('submit', async e => {
   e.preventDefault();
-  const formData = new FormData(form);
 
+  clearInterval(timerInterval);
+  disableExam();
+
+  const formData = new FormData(form);
   const payload = {
     nombre: formData.get('nombre'),
     email: formData.get('email'),
@@ -295,10 +340,8 @@ form.addEventListener('submit', async e => {
     answers: []
   };
 
-  for (const [key, value] of formData.entries()) {
-    if (key.startsWith('q') && value) {
-      payload.answers.push({ questionId: key.substring(1), answer: value });
-    }
+  for (const [k, v] of formData.entries()) {
+    if (k.startsWith('q') && v) payload.answers.push({ questionId: k.substring(1), answer: v });
   }
 
   await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
@@ -308,10 +351,8 @@ form.addEventListener('submit', async e => {
   });
 
   resultadoDiv.innerText = "Exam submitted successfully.";
-  form.reset();
 });
 </script>
 
 </body>
 </html>
-```
