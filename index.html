@@ -31,13 +31,19 @@
       color: #0f172a;
     }
 
-    input {
+    input, textarea {
       width: 100%;
-      margin-top: 10px;
+      margin-top: 6px;
       padding: 10px 12px;
       font-size: 15px;
       border-radius: 6px;
       border: 1px solid #cbd5e1;
+      box-sizing: border-box;
+    }
+
+    input[type="radio"] {
+      width: auto !important;
+      margin: 0;
     }
 
     button {
@@ -45,79 +51,96 @@
       color: #fff;
       border: none;
       border-radius: 6px;
-      padding: 10px 18px;
+      padding: 10px 16px;
       font-size: 15px;
       cursor: pointer;
       margin-top: 15px;
     }
 
-    .hidden { display: none; }
+    button:hover {
+      background: #1e4ed8;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .question {
+      margin-bottom: 26px;
+    }
+
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+      cursor: pointer;
+    }
+
+    .submit-btn {
+      width: 100%;
+      margin-top: 25px;
+      font-size: 16px;
+    }
 
     .error {
       color: #dc2626;
-      margin-top: 10px;
       text-align: center;
+      margin-top: 10px;
     }
   </style>
 </head>
-
 <body>
 
-<!-- LOGIN -->
+<!-- 🔐 LOGIN -->
 <div class="container" id="loginScreen">
   <div class="card">
     <h2>Student Login</h2>
 
-    <input type="text" id="loginUser" placeholder="Student ID">
-    <input type="password" id="loginPass" placeholder="Password">
+    <input type="text" id="loginUser" placeholder="Student ID" required>
+    <input type="password" id="loginPass" placeholder="Password" required>
 
-    <button type="button" onclick="login()">Login</button>
+    <button onclick="login()">Login</button>
     <div id="loginError" class="error"></div>
   </div>
 </div>
 
-<!-- EXAM -->
+<!-- 📝 EXAM -->
 <div class="container hidden" id="examScreen">
   <div class="card">
     <h1>DRILLING TEST</h1>
 
     <form id="examForm">
-      <input type="hidden" id="studentName">
-      <input type="hidden" id="studentEmail">
+      <input type="hidden" name="nombre" id="studentName">
+      <input type="hidden" name="email" id="studentEmail">
+      <input type="hidden" name="testId" value="1">
+
+      <div id="preguntas">Loading questions...</div>
+
+      <button type="submit" class="submit-btn">Submit Exam</button>
     </form>
+
+    <div id="resultado"></div>
   </div>
 </div>
 
 <script>
-/* ========= CONFIG ========= */
-const USE_TEST = true; // 🔴 true = webhook-test | false = webhook (production)
-
-const LOGIN_URL = USE_TEST
-  ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
-  : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
-
-/* ========= LOGIN ========= */
+/* ================= LOGIN ================= */
 async function login() {
-  const user = document.getElementById("loginUser").value.trim();
-  const pass = document.getElementById("loginPass").value.trim();
+  const user = document.getElementById("loginUser").value;
+  const pass = document.getElementById("loginPass").value;
   const error = document.getElementById("loginError");
   error.innerText = "";
 
   try {
-    const res = await fetch(LOGIN_URL, {
+    const res = await fetch("https://gilloli.app.n8n.cloud/webhook-test/login-webhook", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user, pass })
     });
 
-    const raw = await res.text();
-    console.log("RAW RESPONSE:", raw);
-
-    const data = JSON.parse(raw);
-
-    if (!res.ok || !data.success) {
-      throw new Error("Login failed");
-    }
+    const data = await res.json();
+    if (!data.success) throw new Error();
 
     document.getElementById("studentName").value = data.student.name;
     document.getElementById("studentEmail").value = data.student.email;
@@ -125,12 +148,72 @@ async function login() {
     document.getElementById("loginScreen").classList.add("hidden");
     document.getElementById("examScreen").classList.remove("hidden");
 
-  } catch (e) {
-    console.error(e);
+    loadQuestions(); // 🔥 CLAVE
+
+  } catch {
     error.innerText = "Invalid username or password";
   }
 }
-</script>
 
+/* ================= EXAM ================= */
+const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+const form = document.getElementById('examForm');
+const resultadoDiv = document.getElementById('resultado');
+
+function loadQuestions() {
+  fetch(questionsUrl)
+    .then(res => res.json())
+    .then(preguntas => {
+      const container = document.getElementById("preguntas");
+      container.innerHTML = "";
+
+      preguntas.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "question";
+
+        let html = `<p><strong>${p.id}. ${p.pregunta}</strong></p>`;
+
+        if (p.tipo === "multiple option") {
+          html += `
+            <label class="option-row"><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label>
+          `;
+        }
+
+        div.innerHTML = html;
+        container.appendChild(div);
+      });
+    });
+}
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const formData = new FormData(form);
+
+  const payload = {
+    nombre: formData.get('nombre'),
+    email: formData.get('email'),
+    testId: formData.get('testId'),
+    answers: []
+  };
+
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith('q')) {
+      payload.answers.push({ questionId: key.substring(1), answer: value });
+    }
+  }
+
+  await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  resultadoDiv.innerText = "Exam submitted successfully.";
+  form.reset();
+});
+</script>
 </body>
 </html>
