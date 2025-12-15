@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -157,6 +158,7 @@ const LOGIN_URL = USE_TEST
   ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
   : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
 
+/* ⚠️ IMPORTANTE: este DEBE ser el webhook que esté en LISTENING */
 const SUBMIT_URL = USE_TEST
   ? "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission"
   : "https://gilloli.app.n8n.cloud/webhook/student-exam-submission";
@@ -344,9 +346,11 @@ function clearAudio(id) {
 form.addEventListener("submit", async e => {
   e.preventDefault();
 
+  resultadoDiv.innerText = "Submitting exam...";
+  resultadoDiv.style.color = "#1f2937";
+
   clearInterval(timerInterval);
   clearInterval(autosaveInterval);
-  window.removeEventListener("beforeunload", () => {});
   localStorage.removeItem("exam_autosave");
 
   const data = new FormData(form);
@@ -363,13 +367,22 @@ form.addEventListener("submit", async e => {
     }
   }
 
-  await fetch(SUBMIT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
+  try {
+    const res = await fetch(SUBMIT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-  resultadoDiv.innerText = "Exam submitted successfully.";
+    if (!res.ok) throw new Error();
+
+    resultadoDiv.innerText = "Exam submitted successfully.";
+    resultadoDiv.style.color = "#16a34a";
+
+  } catch {
+    resultadoDiv.innerText = "❌ Error submitting exam. Please contact support.";
+    resultadoDiv.style.color = "#dc2626";
+  }
 });
 
 /* ========= AUTO SUBMIT ========= */
@@ -380,3 +393,4 @@ function autoSubmit() {
 
 </body>
 </html>
+```
