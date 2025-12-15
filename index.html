@@ -122,7 +122,7 @@ async function login() {
   error.innerText = "";
 
   try {
-    const res = await fetch("https://gilloli.app.n8n.cloud/webhook/login-webhook", {
+    const res = await fetch("https://gilloli.app.n8n.cloud/webhook-test/login-webhook", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user, pass })
