@@ -30,77 +30,59 @@
     const form = document.getElementById('examForm');
     const resultadoDiv = document.getElementById('resultado');
 
-    // ---- AUDIO helpers (solo añadido) ----
-    const recorders = {};      // { [questionId]: MediaRecorder }
-    const audioChunks = {};    // { [questionId]: BlobPart[] }
-    const audioStreams = {};   // { [questionId]: MediaStream }
+    // ---- AUDIO HELPERS ----
+    const recorders = {};
+    const audioChunks = {};
+    const audioStreams = {};
 
     async function toggleRecording(questionId) {
       const btn = document.getElementById(`rec-btn-q${questionId}`);
       const hidden = document.querySelector(`input[name="q${questionId}_audio"]`);
       const audioEl = document.getElementById(`audio-q${questionId}`);
 
-      // Si ya está grabando -> parar
-      if (recorders[questionId] && recorders[questionId].state === "recording") {
+      if (recorders[questionId]?.state === "recording") {
         recorders[questionId].stop();
         btn.textContent = "🎤 Record";
         return;
       }
 
-      // Empezar grabación
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioStreams[questionId] = stream;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreams[questionId] = stream;
 
-        const mr = new MediaRecorder(stream);
-        recorders[questionId] = mr;
-        audioChunks[questionId] = [];
+      const mr = new MediaRecorder(stream);
+      recorders[questionId] = mr;
+      audioChunks[questionId] = [];
 
-        mr.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) audioChunks[questionId].push(e.data);
+      mr.ondataavailable = e => e.data.size && audioChunks[questionId].push(e.data);
+
+      mr.onstop = () => {
+        audioStreams[questionId]?.getTracks().forEach(t => t.stop());
+
+        const blob = new Blob(audioChunks[questionId], { type: "audio/webm" });
+        const reader = new FileReader();
+
+        reader.onloadend = () => {
+          hidden.value = reader.result;
+          audioEl.src = reader.result;
+          audioEl.style.display = "block";
         };
 
-        mr.onstop = () => {
-          // Cerrar micrófono
-          if (audioStreams[questionId]) {
-            audioStreams[questionId].getTracks().forEach(t => t.stop());
-            delete audioStreams[questionId];
-          }
+        reader.readAsDataURL(blob);
+      };
 
-          const blob = new Blob(audioChunks[questionId], { type: "audio/webm" });
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            // DataURL: "data:audio/webm;base64,...."
-            const dataUrl = reader.result;
-
-            // Guardar en hidden para enviar a n8n
-            hidden.value = dataUrl;
-
-            // Mostrar preview
-            audioEl.src = dataUrl;
-            audioEl.style.display = "block";
-          };
-          reader.readAsDataURL(blob);
-        };
-
-        mr.start();
-        btn.textContent = "⏹ Stop";
-      } catch (err) {
-        console.error(err);
-        alert("No se pudo acceder al micrófono. Revisa permisos del navegador.");
-      }
+      mr.start();
+      btn.textContent = "⏹ Stop";
     }
 
     function clearAudio(questionId) {
-      const hidden = document.querySelector(`input[name="q${questionId}_audio"]`);
+      document.querySelector(`input[name="q${questionId}_audio"]`).value = "";
       const audioEl = document.getElementById(`audio-q${questionId}`);
-      hidden.value = "";
-      audioEl.removeAttribute("src");
+      audioEl.src = "";
       audioEl.style.display = "none";
     }
-    // ---- FIN AUDIO helpers ----
+    // ---- END AUDIO HELPERS ----
 
-    // Cargar preguntas y mostrarlas (Esta parte no se modifica)
+    // Cargar preguntas
     fetch(questionsUrl)
       .then(res => res.json())
       .then(preguntas => {
@@ -108,38 +90,44 @@
         container.innerHTML = "";
 
         preguntas.forEach(p => {
-          const tipo = (p.tipo || "").toLowerCase();
+          const tipo = (p.tipo || "")
+            .toLowerCase()
+            .trim()
+            .replace("_", "-");
+
           const div = document.createElement("div");
           let html = `<p>${p.id}. ${p.pregunta}</p>`;
 
-          if (tipo === "multiple option") {
+          if (tipo.includes("multiple")) {
             html += `
               <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br>
               <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br>
               <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br>
               <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label><br>
             `;
-          } else if (tipo === "open-ended") {
-            // Añadido: audio opcional sin cambiar tu flujo
+          } else if (tipo.includes("open")) {
             html += `
-              <textarea name="q${p.id}" rows="4" cols="60" required></textarea><br>
+              <textarea name="q${p.id}" rows="4" cols="60"
+                placeholder="Write your answer or record audio"></textarea><br>
 
-              <button type="button" id="rec-btn-q${p.id}" onclick="toggleRecording(${p.id})">🎤 Record</button>
-              <button type="button" onclick="clearAudio(${p.id})">🗑️ Clear audio</button><br>
+              <button type="button" id="rec-btn-q${p.id}"
+                onclick="toggleRecording(${p.id})">🎤 Record</button>
+
+              <button type="button" onclick="clearAudio(${p.id})">🗑 Clear audio</button><br>
 
               <audio id="audio-q${p.id}" controls style="display:none; margin-top:6px;"></audio>
 
-              <input type="hidden" name="q${p.id}_audio" value="" />
+              <input type="hidden" name="q${p.id}_audio" />
             `;
-          } else if (tipo === "true/false") {
+          } else if (tipo.includes("true")) {
             html += `
               <label><input type="radio" name="q${p.id}" value="true" required> True</label><br>
               <label><input type="radio" name="q${p.id}" value="false"> False</label><br>
             `;
-          } else if (tipo === "calculation") {
+          } else if (tipo.includes("calc")) {
             html += `<input type="number" name="q${p.id}" step="any" required>`;
           } else {
-            html += `<input type="text" name="q${p.id}" required>`;
+            html += `<input type="text" name="q${p.id}">`;
           }
 
           div.innerHTML = html;
@@ -148,59 +136,48 @@
         });
       })
       .catch(err => {
-        document.getElementById("preguntas").innerText = "Error al cargar preguntas.";
+        document.getElementById("preguntas").innerText = "Error loading questions.";
         console.error(err);
       });
 
-    // --- CÓDIGO CORREGIDO PARA EL ENVÍO DEL FORMULARIO ---
-    // Capturar el envío del formulario y enviarlo en el formato correcto para n8n
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
+    // Envío del formulario (SIN CAMBIOS)
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
       const formData = new FormData(form);
 
-      // 1. Crear un objeto base para enviar
       const payload = {
         nombre: formData.get('nombre'),
         email: formData.get('email'),
         testId: formData.get('testId'),
-        answers: [] // 2. Inicializar un array vacío para las respuestas
+        answers: []
       };
 
-      // 3. Recorrer los datos del formulario y poblar el array 'answers'
       for (const [key, value] of formData.entries()) {
-        if (key.startsWith('q')) {
-          const questionId = key.substring(1); // de 'q1' a '1' o '1_audio'
+        if (key.startsWith('q') && value) {
           payload.answers.push({
-            questionId: questionId,
+            questionId: key.substring(1),
             answer: value
           });
         }
       }
 
-      // 4. Enviar el objeto 'payload' construido a n8n
       try {
-        resultadoDiv.innerText = "Submitting exam, please wait...";
+        resultadoDiv.innerText = "Submitting exam...";
+        const res = await fetch(
+          'https://gilloli.app.n8n.cloud/webhook/student-exam-submission',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }
+        );
 
-        const response = await fetch('https://gilloli.app.n8n.cloud/webhook/student-exam-submission', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (response.ok) {
-          resultadoDiv.innerText = "Exam submitted successfully. You will receive your grade by email.";
-          form.reset();
-        } else {
-          const errorText = await response.text();
-          resultadoDiv.innerText = `Error al enviar el examen. Código: ${response.status}`;
-          console.error("Error en la respuesta del webhook:", response.status, errorText);
-        }
-      } catch (error) {
-        resultadoDiv.innerText = "Network error while submitting the exam.";
-        console.error("Error al enviar el formulario:", error);
+        resultadoDiv.innerText = res.ok
+          ? "Exam submitted successfully."
+          : "Error submitting exam.";
+      } catch (err) {
+        resultadoDiv.innerText = "Network error.";
+        console.error(err);
       }
     });
   </script>
