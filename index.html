@@ -39,6 +39,7 @@
       font-weight: 600;
       color: #2563eb;
     }
+
     #timer.warning { color: #d97706; }
     #timer.danger { color: #dc2626; }
 
@@ -147,26 +148,35 @@
 </div>
 
 <script>
+/* ========= CONFIG ========= */
 const USE_TEST = true;
 const EXAM_DURATION = 30 * 60;
 const AUTOSAVE_INTERVAL = 30 * 1000;
-let timeLeft = EXAM_DURATION;
-let timerInterval, autosaveInterval;
 
 const LOGIN_URL = USE_TEST
   ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
   : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
 
+const SUBMIT_URL = USE_TEST
+  ? "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission"
+  : "https://gilloli.app.n8n.cloud/webhook/student-exam-submission";
+
 const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+
+/* ========= STATE ========= */
+let timeLeft = EXAM_DURATION;
+let timerInterval, autosaveInterval;
+let mediaRecorder;
+let audioChunks = {};
 
 const form = document.getElementById("examForm");
 const timerEl = document.getElementById("timer");
 const resultadoDiv = document.getElementById("resultado");
 
-let mediaRecorder;
-let audioChunks = {};
-
+/* ========= LOGIN ========= */
 async function login() {
+  loginError.innerText = "";
+
   try {
     const res = await fetch(LOGIN_URL, {
       method: "POST",
@@ -196,7 +206,7 @@ async function login() {
   }
 }
 
-/* ===== TIMER ===== */
+/* ========= TIMER ========= */
 function startTimer() {
   updateTimer();
   timerInterval = setInterval(() => {
@@ -214,7 +224,7 @@ function updateTimer() {
   else if (timeLeft <= 600) timerEl.className = "warning";
 }
 
-/* ===== AUTOSAVE ===== */
+/* ========= AUTOSAVE ========= */
 function startAutosave() {
   autosaveInterval = setInterval(saveProgress, AUTOSAVE_INTERVAL);
 }
@@ -229,9 +239,11 @@ function restoreAutosave() {
   const saved = localStorage.getItem("exam_autosave");
   if (!saved) return;
   const data = JSON.parse(saved);
+
   Object.keys(data).forEach(k => {
     const el = form.elements[k];
     if (!el) return;
+
     if (el.type === "radio") {
       document.querySelector(`input[name="${k}"][value="${data[k]}"]`)?.click();
     } else {
@@ -240,63 +252,65 @@ function restoreAutosave() {
   });
 }
 
-/* ===== BLOCK EXIT ===== */
+/* ========= BLOCK EXIT ========= */
 window.addEventListener("beforeunload", e => {
   saveProgress();
   e.preventDefault();
   e.returnValue = "";
 });
 
-/* ===== QUESTIONS ===== */
+/* ========= QUESTIONS ========= */
 function loadQuestions() {
-  fetch(questionsUrl).then(r => r.json()).then(preguntas => {
-    preguntas.innerHTML = "";
-    const container = document.getElementById("preguntas");
+  fetch(questionsUrl)
+    .then(res => res.json())
+    .then(preguntas => {
+      const container = document.getElementById("preguntas");
+      container.innerHTML = "";
 
-    preguntas.forEach(p => {
-      let html = `<div class="question"><strong>${p.id}. ${p.pregunta}</strong>`;
+      preguntas.forEach(p => {
+        let html = `<div class="question"><strong>${p.id}. ${p.pregunta}</strong>`;
 
-      if (p.tipo === "multiple option") {
-        ["A","B","C","D"].forEach(o => {
-          html += `<label class="option-row">
-            <input type="radio" name="q${p.id}" value="${o}"> ${o}) ${p["opcion"+o]}
-          </label>`;
-        });
-      }
+        if (p.tipo === "multiple option") {
+          ["A","B","C","D"].forEach(o => {
+            html += `<label class="option-row">
+              <input type="radio" name="q${p.id}" value="${o}"> ${o}) ${p["opcion"+o]}
+            </label>`;
+          });
+        }
 
-      if (p.tipo === "open-ended") {
-        html += `
-          <textarea name="q${p.id}" placeholder="Write your answer or record audio"></textarea>
-          <div class="audio-actions">
-            <button type="button" onclick="toggleRecording(${p.id})">🎤 Record</button>
-            <button type="button" class="secondary-btn" onclick="clearAudio(${p.id})">🗑 Clear audio</button>
-          </div>
-          <input type="hidden" name="q${p.id}_audio">
-        `;
-      }
+        if (p.tipo === "open-ended") {
+          html += `
+            <textarea name="q${p.id}" placeholder="Write your answer or record audio"></textarea>
+            <div class="audio-actions">
+              <button type="button" onclick="toggleRecording(${p.id})">🎤 Record</button>
+              <button type="button" class="secondary-btn" onclick="clearAudio(${p.id})">🗑 Clear audio</button>
+            </div>
+            <input type="hidden" name="q${p.id}_audio">
+          `;
+        }
 
-      if (p.tipo === "calculation") {
-        html += `
-          <div class="calc-wrapper">
-            <input type="number" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})">
-            <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})">
-            <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
-          </div>`;
-      }
+        if (p.tipo === "calculation") {
+          html += `
+            <div class="calc-wrapper">
+              <input type="number" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})">
+              <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})">
+              <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
+            </div>`;
+        }
 
-      if (p.tipo === "true/false") {
-        html += `
-          <label class="option-row"><input type="radio" name="q${p.id}" value="true"> True</label>
-          <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>`;
-      }
+        if (p.tipo === "true/false") {
+          html += `
+            <label class="option-row"><input type="radio" name="q${p.id}" value="true"> True</label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>`;
+        }
 
-      html += "</div>";
-      container.insertAdjacentHTML("beforeend", html);
+        html += "</div>";
+        container.insertAdjacentHTML("beforeend", html);
+      });
     });
-  });
 }
 
-/* ===== AUDIO / CALC ===== */
+/* ========= AUDIO & CALC ========= */
 function updateCalc(id) {
   const w = document.getElementById(`calc-q${id}`).parentElement;
   document.getElementById(`calc-q${id}`).value =
@@ -326,21 +340,30 @@ function clearAudio(id) {
   document.querySelector(`input[name="q${id}_audio"]`).value = "";
 }
 
-/* ===== SUBMIT ===== */
+/* ========= SUBMIT ========= */
 form.addEventListener("submit", async e => {
   e.preventDefault();
+
   clearInterval(timerInterval);
   clearInterval(autosaveInterval);
+  window.removeEventListener("beforeunload", () => {});
   localStorage.removeItem("exam_autosave");
 
   const data = new FormData(form);
-  const payload = { nombre: data.get("nombre"), email: data.get("email"), testId: data.get("testId"), answers: [] };
+  const payload = {
+    nombre: data.get("nombre"),
+    email: data.get("email"),
+    testId: data.get("testId"),
+    answers: []
+  };
 
   for (const [k, v] of data.entries()) {
-    if (k.startsWith("q") && v) payload.answers.push({ questionId: k.substring(1), answer: v });
+    if (k.startsWith("q") && v) {
+      payload.answers.push({ questionId: k.substring(1), answer: v });
+    }
   }
 
-  await fetch("https://gilloli.app.n8n.cloud/webhook/student-exam-submission", {
+  await fetch(SUBMIT_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -348,6 +371,11 @@ form.addEventListener("submit", async e => {
 
   resultadoDiv.innerText = "Exam submitted successfully.";
 });
+
+/* ========= AUTO SUBMIT ========= */
+function autoSubmit() {
+  form.requestSubmit();
+}
 </script>
 
 </body>
