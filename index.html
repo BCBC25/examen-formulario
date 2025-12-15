@@ -8,7 +8,7 @@
     body {
       margin: 0;
       font-family: "Segoe UI", Roboto, Arial, sans-serif;
-      background: linear-gradient(135deg, #eef2f7, #dbe7f3);
+      background: linear-gradient(135deg, #eef2f7, #dbeafe);
       color: #1f2937;
     }
 
@@ -25,15 +25,14 @@
       padding: 35px;
     }
 
-    h1, h2 {
+    h1 {
+      text-align: center;
       margin-top: 0;
       color: #0f172a;
     }
 
     label {
-      font-weight: 600;
-      margin-top: 12px;
-      display: block;
+      font-weight: 500;
     }
 
     input, textarea {
@@ -54,10 +53,9 @@
       color: #fff;
       border: none;
       border-radius: 6px;
-      padding: 10px 18px;
-      font-size: 15px;
+      padding: 8px 16px;
+      font-size: 14px;
       cursor: pointer;
-      transition: background 0.2s ease;
     }
 
     button:hover {
@@ -74,28 +72,39 @@
       background: #e2e8f0;
     }
 
-    .hidden {
-      display: none;
-    }
-
     .question {
       margin-bottom: 28px;
     }
 
+    /* ===== MULTIPLE CHOICE COMPACT ===== */
+    .multiple-options label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0;
+      font-weight: 400;
+    }
+
+    .multiple-options input[type="radio"] {
+      margin: 0;
+    }
+
+    .multiple-options label:hover {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding-left: 4px;
+    }
+
+    /* ===== OPEN ENDED + AUDIO ===== */
     .open-question textarea {
       border: 1px solid #94a3b8;
     }
 
     .audio-actions {
       display: flex;
-      gap: 12px;
-      margin-top: 8px;
+      gap: 10px;
+      margin-top: 6px;
       margin-bottom: 6px;
-    }
-
-    .audio-actions button {
-      padding: 7px 14px;
-      font-size: 14px;
     }
 
     audio {
@@ -103,18 +112,9 @@
       margin-top: 6px;
     }
 
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
-    .header small {
-      color: #475569;
-    }
-
     .submit-btn {
-      margin-top: 25px;
       width: 100%;
+      margin-top: 25px;
       font-size: 16px;
     }
   </style>
@@ -123,10 +123,7 @@
 
   <div class="container">
     <div class="card">
-      <div class="header">
-        <h1>DRILLING TEST</h1>
-        <small>Official Student Examination</small>
-      </div>
+      <h1>DRILLING TEST</h1>
 
       <form id="examForm">
         <label>Name</label>
@@ -204,10 +201,12 @@
 
           if (tipo === "multiple option") {
             html += `
-              <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label><br>
-              <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label><br>
-              <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label><br>
-              <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label>
+              <div class="multiple-options">
+                <label><input type="radio" name="q${p.id}" value="A" required> A) ${p.opcionA}</label>
+                <label><input type="radio" name="q${p.id}" value="B"> B) ${p.opcionB}</label>
+                <label><input type="radio" name="q${p.id}" value="C"> C) ${p.opcionC}</label>
+                <label><input type="radio" name="q${p.id}" value="D"> D) ${p.opcionD}</label>
+              </div>
             `;
           } 
           else if (tipo === "open-ended") {
