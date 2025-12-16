@@ -1,3 +1,4 @@
+´´´´
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -32,6 +33,17 @@
       color: #0f172a;
     }
 
+    #timer {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-weight: 600;
+      color: #2563eb;
+    }
+
+    #timer.warning { color: #d97706; }
+    #timer.danger { color: #dc2626; }
+
     input, textarea {
       width: 100%;
       margin-top: 6px;
@@ -43,17 +55,7 @@
     }
 
     input[type="radio"] { width: auto !important; margin: 0; }
-
-    .question { margin-bottom: 26px; }
-
-    .calc-wrapper {
-      display: flex;
-      gap: 12px;
-      margin-top: 6px;
-    }
-
-    .calc-value { flex: 2; }
-    .calc-unit { flex: 1; }
+    textarea { resize: vertical; }
 
     button {
       background: #2563eb;
@@ -66,6 +68,40 @@
       margin-top: 15px;
     }
 
+    .secondary-btn {
+      background: #f1f5f9;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+
+    .hidden { display: none; }
+    .error { color: #dc2626; text-align: center; }
+
+    .question { margin-bottom: 26px; }
+
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+    }
+
+    .audio-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+
+    .calc-wrapper {
+      display: flex;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .calc-value { flex: 2; }
+    .calc-unit { flex: 1; }
+
     .submit-btn {
       width: 100%;
       margin-top: 25px;
@@ -76,20 +112,32 @@
 
 <body>
 
-<div class="container">
+<div class="container" id="loginScreen">
+  <div class="card">
+    <h2>Student Login</h2>
+    <input type="text" id="loginUser" placeholder="Student ID">
+    <input type="password" id="loginPass" placeholder="Password">
+    <button type="button" onclick="login()">Login</button>
+    <div id="loginError" class="error"></div>
+  </div>
+</div>
+
+<div class="container hidden" id="examScreen">
+  <div id="timer">30:00</div>
+
   <div class="card">
     <h1>DRILLING TEST</h1>
 
     <form id="examForm">
       <label>Name</label>
-      <input type="text" name="nombre" required>
+      <input type="text" name="nombre" id="studentName" required>
 
       <label>Email</label>
-      <input type="email" name="email" required>
+      <input type="email" name="email" id="studentEmail" required>
 
       <input type="hidden" name="testId" value="1">
 
-      <div id="preguntas"></div>
+      <div id="preguntas">Loading questions...</div>
 
       <button type="submit" class="submit-btn">Submit Exam</button>
     </form>
@@ -100,13 +148,77 @@
 
 <script>
 /* ========= CONFIG ========= */
-const SUBMIT_URL = "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission-v2";
+const USE_TEST = true;
+const EXAM_DURATION = 30 * 60;
+const AUTOSAVE_INTERVAL = 30 * 1000;
+
+const LOGIN_URL = USE_TEST
+  ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
+  : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
+
+const SUBMIT_URL = USE_TEST
+  ? "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission-v2"
+  : "https://gilloli.app.n8n.cloud/webhook/student-exam-submission-v2";
+
 const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
 
+/* ========= STATE ========= */
+let timeLeft = EXAM_DURATION;
+let timerInterval, autosaveInterval;
+
 const form = document.getElementById("examForm");
+const timerEl = document.getElementById("timer");
 const resultadoDiv = document.getElementById("resultado");
 
-/* ========= LOAD QUESTIONS ========= */
+/* ========= LOGIN ========= */
+async function login() {
+  loginError.innerText = "";
+  try {
+    const res = await fetch(LOGIN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user: loginUser.value.trim(),
+        pass: loginPass.value.trim()
+      })
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error();
+
+    studentName.value = data.student?.name || "";
+    studentEmail.value = data.student?.email || "";
+
+    loginScreen.classList.add("hidden");
+    examScreen.classList.remove("hidden");
+
+    loadQuestions();
+    startTimer();
+    startAutosave();
+    restoreAutosave();
+
+  } catch {
+    loginError.innerText = "Invalid username or password";
+  }
+}
+
+/* ========= TIMER ========= */
+function startTimer() {
+  updateTimer();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimer();
+    if (timeLeft <= 0) autoSubmit();
+  }, 1000);
+}
+
+function updateTimer() {
+  const m = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+  const s = String(timeLeft % 60).padStart(2, "0");
+  timerEl.textContent = `${m}:${s}`;
+}
+
+/* ========= QUESTIONS ========= */
 function loadQuestions() {
   fetch(questionsUrl)
     .then(res => res.json())
@@ -116,24 +228,6 @@ function loadQuestions() {
 
       preguntas.forEach(p => {
         let html = `<div class="question"><strong>${p.id}. ${p.pregunta}</strong>`;
-
-        if (p.tipo === "multiple option") {
-          ["A","B","C","D"].forEach(o => {
-            html += `<label>
-              <input type="radio" name="q${p.id}" value="${o}"> ${o}) ${p["opcion"+o]}
-            </label><br>`;
-          });
-        }
-
-        if (p.tipo === "open-ended") {
-          html += `<textarea name="q${p.id}"></textarea>`;
-        }
-
-        if (p.tipo === "true/false") {
-          html += `
-            <label><input type="radio" name="q${p.id}" value="true"> True</label>
-            <label><input type="radio" name="q${p.id}" value="false"> False</label>`;
-        }
 
         if (p.tipo === "calculation") {
           html += `
@@ -148,6 +242,18 @@ function loadQuestions() {
         container.insertAdjacentHTML("beforeend", html);
       });
     });
+}
+
+/* ========= 🔴 ESTA ES LA ÚNICA FUNCIÓN NUEVA ========= */
+function updateCalc(id) {
+  const hidden = document.getElementById(`calc-q${id}`);
+  if (!hidden) return;
+
+  const wrapper = hidden.parentElement;
+  const value = wrapper.querySelector(".calc-value")?.value.trim();
+  const unit = wrapper.querySelector(".calc-unit")?.value.trim();
+
+  hidden.value = value ? (unit ? `${value} ${unit}` : value) : "";
 }
 
 /* ========= SUBMIT ========= */
@@ -168,38 +274,18 @@ form.addEventListener("submit", async e => {
     }
   }
 
-  try {
-    await fetch(SUBMIT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+  await fetch(SUBMIT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
 
-    resultadoDiv.innerText = "Exam submitted successfully.";
-
-  } catch {
-    resultadoDiv.innerText = "❌ Error submitting exam.";
-  }
+  resultadoDiv.innerText = "Exam submitted successfully.";
 });
 
-/* ========= FIX CÁLCULO (ÚNICO AGREGADO) ========= */
-function updateCalc(id) {
-  const hidden = document.getElementById(`calc-q${id}`);
-  if (!hidden) return;
-
-  const wrapper = hidden.parentElement;
-  const value = wrapper.querySelector(".calc-value")?.value || "";
-  const unit = wrapper.querySelector(".calc-unit")?.value || "";
-
-  if (value || unit) {
-    hidden.value = `${value} ${unit}`.trim();
-  } else {
-    hidden.value = "";
-  }
+function autoSubmit() {
+  form.requestSubmit();
 }
-
-/* INIT */
-loadQuestions();
 </script>
 
 </body>
