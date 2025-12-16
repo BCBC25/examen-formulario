@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -157,18 +158,19 @@ const LOGIN_URL = USE_TEST
   ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
   : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
 
-/* ⚠️ IMPORTANTE: este DEBE ser el webhook que esté en LISTENING */
 const SUBMIT_URL = USE_TEST
   ? "https://gilloli.app.n8n.cloud/webhook-test/exam-submission"
   : "https://gilloli.app.n8n.cloud/webhook/exam-submission";
 
-const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+const questionsUrl =
+  "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
 
 /* ========= STATE ========= */
 let timeLeft = EXAM_DURATION;
 let timerInterval, autosaveInterval;
 let mediaRecorder;
 let audioChunks = {};
+let isSubmitting = false;
 
 const form = document.getElementById("examForm");
 const timerEl = document.getElementById("timer");
@@ -255,6 +257,7 @@ function restoreAutosave() {
 
 /* ========= BLOCK EXIT ========= */
 window.addEventListener("beforeunload", e => {
+  if (isSubmitting) return;
   saveProgress();
   e.preventDefault();
   e.returnValue = "";
@@ -345,6 +348,7 @@ function clearAudio(id) {
 form.addEventListener("submit", async e => {
   e.preventDefault();
 
+  isSubmitting = true;
   resultadoDiv.innerText = "Submitting exam...";
   resultadoDiv.style.color = "#1f2937";
 
@@ -379,6 +383,7 @@ form.addEventListener("submit", async e => {
     resultadoDiv.style.color = "#16a34a";
 
   } catch {
+    isSubmitting = false;
     resultadoDiv.innerText = "❌ Error submitting exam. Please contact support.";
     resultadoDiv.style.color = "#dc2626";
   }
@@ -392,3 +397,4 @@ function autoSubmit() {
 
 </body>
 </html>
+```
