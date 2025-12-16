@@ -1,4 +1,3 @@
-´´´´
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -158,19 +157,18 @@ const LOGIN_URL = USE_TEST
   ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
   : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
 
+/* ⚠️ IMPORTANTE: este DEBE ser el webhook que esté en LISTENING */
 const SUBMIT_URL = USE_TEST
-  ? "https://gilloli.app.n8n.cloud/webhook-test/exam-submission"
-  : "https://gilloli.app.n8n.cloud/webhook/exam-submission";
+  ? "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission"
+  : "https://gilloli.app.n8n.cloud/webhook/student-exam-submission";
 
-const questionsUrl =
-  "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
+const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
 
 /* ========= STATE ========= */
 let timeLeft = EXAM_DURATION;
 let timerInterval, autosaveInterval;
 let mediaRecorder;
 let audioChunks = {};
-let isSubmitting = false;
 
 const form = document.getElementById("examForm");
 const timerEl = document.getElementById("timer");
@@ -257,7 +255,6 @@ function restoreAutosave() {
 
 /* ========= BLOCK EXIT ========= */
 window.addEventListener("beforeunload", e => {
-  if (isSubmitting) return;
   saveProgress();
   e.preventDefault();
   e.returnValue = "";
@@ -344,11 +341,9 @@ function clearAudio(id) {
   document.querySelector(`input[name="q${id}_audio"]`).value = "";
 }
 
-/* ========= SUBMIT (FORM POST REAL) ========= */
-form.addEventListener("submit", e => {
+/* ========= SUBMIT ========= */
+form.addEventListener("submit", async e => {
   e.preventDefault();
-
-  isSubmitting = true;
 
   resultadoDiv.innerText = "Submitting exam...";
   resultadoDiv.style.color = "#1f2937";
@@ -371,22 +366,22 @@ form.addEventListener("submit", e => {
     }
   }
 
-  const postForm = document.createElement("form");
-  postForm.method = "POST";
-  postForm.action = SUBMIT_URL;
-  postForm.style.display = "none";
+  try {
+    const res = await fetch(SUBMIT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-  const input = document.createElement("input");
-  input.type = "hidden";
-  input.name = "data";
-  input.value = JSON.stringify(payload);
+    if (!res.ok) throw new Error();
 
-  postForm.appendChild(input);
-  document.body.appendChild(postForm);
-  postForm.submit();
+    resultadoDiv.innerText = "Exam submitted successfully.";
+    resultadoDiv.style.color = "#16a34a";
 
-  resultadoDiv.innerText = "Exam submitted successfully.";
-  resultadoDiv.style.color = "#16a34a";
+  } catch {
+    resultadoDiv.innerText = "❌ Error submitting exam. Please contact support.";
+    resultadoDiv.style.color = "#dc2626";
+  }
 });
 
 /* ========= AUTO SUBMIT ========= */
