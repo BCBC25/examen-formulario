@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -371,13 +370,12 @@ form.addEventListener("submit", async e => {
   }
 
   try {
-    const res = await fetch(SUBMIT_URL, {
+    await fetch(SUBMIT_URL, {
       method: "POST",
+      mode: "no-cors",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-
-    if (!res.ok) throw new Error();
 
     resultadoDiv.innerText = "Exam submitted successfully.";
     resultadoDiv.style.color = "#16a34a";
@@ -397,4 +395,3 @@ function autoSubmit() {
 
 </body>
 </html>
-```
