@@ -1,162 +1,393 @@
-´´
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<title>University Examination Portal</title>
+  <meta charset="UTF-8" />
+  <title>University Examination Portal</title>
 
-<style>
-body {
-  margin: 0;
-  font-family: "Segoe UI", Roboto, Arial, sans-serif;
-  background: linear-gradient(135deg, #eef2f7, #dbeafe);
-}
-.container {
-  max-width: 900px;
-  margin: auto;
-  padding: 40px 20px;
-  position: relative;
-}
-.card {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-  padding: 35px;
-}
-.hidden { display: none; }
-.question { margin-bottom: 26px; }
-.option-row { display: flex; gap: 8px; margin: 6px 0; }
-.calc-wrapper { display: flex; gap: 12px; margin-top: 6px; }
-.calc-value { flex: 2; }
-.calc-unit { flex: 1; }
-.submit-btn { width: 100%; margin-top: 25px; font-size: 16px; }
-</style>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(135deg, #eef2f7, #dbeafe);
+      color: #1f2937;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 40px 20px;
+      position: relative;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      padding: 35px;
+    }
+
+    h1, h2 {
+      text-align: center;
+      margin-top: 0;
+      color: #0f172a;
+    }
+
+    #timer {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-weight: 600;
+      color: #2563eb;
+    }
+
+    #timer.warning { color: #d97706; }
+    #timer.danger { color: #dc2626; }
+
+    input, textarea {
+      width: 100%;
+      margin-top: 6px;
+      padding: 10px 12px;
+      font-size: 15px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      box-sizing: border-box;
+    }
+
+    input[type="radio"] { width: auto !important; margin: 0; }
+    textarea { resize: vertical; }
+
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 15px;
+    }
+
+    .secondary-btn {
+      background: #f1f5f9;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+
+    .hidden { display: none; }
+    .error { color: #dc2626; text-align: center; }
+
+    .question { margin-bottom: 26px; }
+
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+    }
+
+    .audio-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+
+    .calc-wrapper {
+      display: flex;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .calc-value { flex: 2; }
+    .calc-unit { flex: 1; }
+
+    .submit-btn {
+      width: 100%;
+      margin-top: 25px;
+      font-size: 16px;
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="container hidden" id="examScreen">
-<div class="card">
-<h1>DRILLING TEST</h1>
-
-<form id="examForm">
-<label>Name</label>
-<input type="text" name="nombre" required>
-
-<label>Email</label>
-<input type="email" name="email" required>
-
-<input type="hidden" name="testId" value="1">
-
-<div id="preguntas">Loading questions...</div>
-
-<button type="submit" class="submit-btn">Submit Exam</button>
-</form>
-
-<div id="resultado"></div>
+<!-- LOGIN -->
+<div class="container" id="loginScreen">
+  <div class="card">
+    <h2>Student Login</h2>
+    <input type="text" id="loginUser" placeholder="Student ID">
+    <input type="password" id="loginPass" placeholder="Password">
+    <button type="button" onclick="login()">Login</button>
+    <div id="loginError" class="error"></div>
+  </div>
 </div>
+
+<!-- EXAM -->
+<div class="container hidden" id="examScreen">
+  <div id="timer">30:00</div>
+
+  <div class="card">
+    <h1>DRILLING TEST</h1>
+
+    <form id="examForm">
+      <label>Name</label>
+      <input type="text" name="nombre" id="studentName" required>
+
+      <label>Email</label>
+      <input type="email" name="email" id="studentEmail" required>
+
+      <input type="hidden" name="testId" value="1">
+
+      <div id="preguntas">Loading questions...</div>
+
+      <button type="submit" class="submit-btn">Submit Exam</button>
+    </form>
+
+    <div id="resultado"></div>
+  </div>
 </div>
 
 <script>
 /* ========= CONFIG ========= */
-const SUBMIT_URL = "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission-v2";
+const USE_TEST = true;
+const EXAM_DURATION = 30 * 60;
+const AUTOSAVE_INTERVAL = 30 * 1000;
+
+const LOGIN_URL = USE_TEST
+  ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
+  : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
+
+/* ⚠️ IMPORTANTE: este DEBE ser el webhook que esté en LISTENING */
+const SUBMIT_URL = USE_TEST
+  ? "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission"
+  : "https://gilloli.app.n8n.cloud/webhook/student-exam-submission";
+
 const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
 
+/* ========= STATE ========= */
+let timeLeft = EXAM_DURATION;
+let timerInterval, autosaveInterval;
+let mediaRecorder;
+let audioChunks = {};
+
 const form = document.getElementById("examForm");
+const timerEl = document.getElementById("timer");
 const resultadoDiv = document.getElementById("resultado");
 
-/* ========= LOAD QUESTIONS ========= */
-fetch(questionsUrl)
-.then(res => res.json())
-.then(preguntas => {
-  const container = document.getElementById("preguntas");
-  container.innerHTML = "";
+/* ========= LOGIN ========= */
+async function login() {
+  loginError.innerText = "";
 
-  preguntas.forEach(p => {
-    let html = `<div class="question"><strong>${p.id}. ${p.pregunta}</strong>`;
-
-    if (p.tipo === "multiple option") {
-      ["A","B","C","D"].forEach(o => {
-        html += `
-        <label class="option-row">
-          <input type="radio" name="q${p.id}" value="${o}"> ${o}) ${p["opcion"+o]}
-        </label>`;
-      });
-    }
-
-    if (p.tipo === "true/false") {
-      html += `
-        <label class="option-row"><input type="radio" name="q${p.id}" value="true"> True</label>
-        <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>`;
-    }
-
-    if (p.tipo === "open-ended") {
-      html += `<textarea name="q${p.id}"></textarea>`;
-    }
-
-    /* 🔥 FIX CÁLCULOS */
-    if (p.tipo === "calculation") {
-      html += `
-      <div class="calc-wrapper" data-calc-id="${p.id}">
-        <input type="number" class="calc-value" placeholder="Value">
-        <input type="text" class="calc-unit" placeholder="Units">
-        <input type="hidden" name="q${p.id}">
-      </div>`;
-    }
-
-    html += "</div>";
-    container.insertAdjacentHTML("beforeend", html);
-  });
-
-  document.getElementById("examScreen").classList.remove("hidden");
-});
-
-/* ========= SUBMIT ========= */
-form.addEventListener("submit", async e => {
-e.preventDefault();
-
-/* 🔥 FORZAR CÁLCULOS */
-document.querySelectorAll(".calc-wrapper").forEach(w => {
-  const id = w.dataset.calcId;
-  const value = w.querySelector(".calc-value").value || "";
-  const unit = w.querySelector(".calc-unit").value || "";
-  w.querySelector(`input[name="q${id}"]`).value =
-    `${value} ${unit}`.trim();
-});
-
-const data = new FormData(form);
-
-const payload = {
-  nombre: data.get("nombre"),
-  email: data.get("email"),
-  testId: data.get("testId"),
-  answers: []
-};
-
-for (const [k, v] of data.entries()) {
-  if (k.startsWith("q")) {
-    payload.answers.push({
-      questionId: k.substring(1),
-      answer: v || ""
+  try {
+    const res = await fetch(LOGIN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user: loginUser.value.trim(),
+        pass: loginPass.value.trim()
+      })
     });
+
+    const data = await res.json();
+    if (!data.success) throw new Error();
+
+    studentName.value = data.student?.name || "";
+    studentEmail.value = data.student?.email || "";
+
+    loginScreen.classList.add("hidden");
+    examScreen.classList.remove("hidden");
+
+    loadQuestions();
+    startTimer();
+    startAutosave();
+    restoreAutosave();
+
+  } catch {
+    loginError.innerText = "Invalid username or password";
   }
 }
 
-try {
-  await fetch(SUBMIT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  resultadoDiv.innerText = "Exam submitted successfully.";
-  resultadoDiv.style.color = "green";
-
-} catch {
-  resultadoDiv.innerText = "Error submitting exam.";
-  resultadoDiv.style.color = "red";
+/* ========= TIMER ========= */
+function startTimer() {
+  updateTimer();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimer();
+    if (timeLeft <= 0) autoSubmit();
+  }, 1000);
 }
+
+function updateTimer() {
+  const m = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+  const s = String(timeLeft % 60).padStart(2, "0");
+  timerEl.textContent = `${m}:${s}`;
+  if (timeLeft <= 300) timerEl.className = "danger";
+  else if (timeLeft <= 600) timerEl.className = "warning";
+}
+
+/* ========= AUTOSAVE ========= */
+function startAutosave() {
+  autosaveInterval = setInterval(saveProgress, AUTOSAVE_INTERVAL);
+}
+
+function saveProgress() {
+  const data = {};
+  new FormData(form).forEach((v, k) => data[k] = v);
+  localStorage.setItem("exam_autosave", JSON.stringify(data));
+}
+
+function restoreAutosave() {
+  const saved = localStorage.getItem("exam_autosave");
+  if (!saved) return;
+  const data = JSON.parse(saved);
+
+  Object.keys(data).forEach(k => {
+    const el = form.elements[k];
+    if (!el) return;
+
+    if (el.type === "radio") {
+      document.querySelector(`input[name="${k}"][value="${data[k]}"]`)?.click();
+    } else {
+      el.value = data[k];
+    }
+  });
+}
+
+/* ========= BLOCK EXIT ========= */
+window.addEventListener("beforeunload", e => {
+  saveProgress();
+  e.preventDefault();
+  e.returnValue = "";
 });
+
+/* ========= QUESTIONS ========= */
+function loadQuestions() {
+  fetch(questionsUrl)
+    .then(res => res.json())
+    .then(preguntas => {
+      const container = document.getElementById("preguntas");
+      container.innerHTML = "";
+
+      preguntas.forEach(p => {
+        let html = `<div class="question"><strong>${p.id}. ${p.pregunta}</strong>`;
+
+        if (p.tipo === "multiple option") {
+          ["A","B","C","D"].forEach(o => {
+            html += `<label class="option-row">
+              <input type="radio" name="q${p.id}" value="${o}"> ${o}) ${p["opcion"+o]}
+            </label>`;
+          });
+        }
+
+        if (p.tipo === "open-ended") {
+          html += `
+            <textarea name="q${p.id}" placeholder="Write your answer or record audio"></textarea>
+            <div class="audio-actions">
+              <button type="button" onclick="toggleRecording(${p.id})">🎤 Record</button>
+              <button type="button" class="secondary-btn" onclick="clearAudio(${p.id})">🗑 Clear audio</button>
+            </div>
+            <input type="hidden" name="q${p.id}_audio">
+          `;
+        }
+
+        if (p.tipo === "calculation") {
+          html += `
+            <div class="calc-wrapper">
+              <input type="number" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})">
+              <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})">
+              <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
+            </div>`;
+        }
+
+        if (p.tipo === "true/false") {
+          html += `
+            <label class="option-row"><input type="radio" name="q${p.id}" value="true"> True</label>
+            <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>`;
+        }
+
+        html += "</div>";
+        container.insertAdjacentHTML("beforeend", html);
+      });
+    });
+}
+
+/* ========= AUDIO & CALC ========= */
+function updateCalc(id) {
+  const w = document.getElementById(`calc-q${id}`).parentElement;
+  document.getElementById(`calc-q${id}`).value =
+    `${w.querySelector(".calc-value").value} ${w.querySelector(".calc-unit").value}`.trim();
+}
+
+async function toggleRecording(id) {
+  if (!mediaRecorder || mediaRecorder.state === "inactive") {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks[id] = [];
+    mediaRecorder.ondataavailable = e => audioChunks[id].push(e.data);
+    mediaRecorder.onstop = () => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        document.querySelector(`input[name="q${id}_audio"]`).value = reader.result;
+      };
+      reader.readAsDataURL(new Blob(audioChunks[id]));
+    };
+    mediaRecorder.start();
+  } else {
+    mediaRecorder.stop();
+  }
+}
+
+function clearAudio(id) {
+  document.querySelector(`input[name="q${id}_audio"]`).value = "";
+}
+
+/* ========= SUBMIT ========= */
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+
+  resultadoDiv.innerText = "Submitting exam...";
+  resultadoDiv.style.color = "#1f2937";
+
+  clearInterval(timerInterval);
+  clearInterval(autosaveInterval);
+  localStorage.removeItem("exam_autosave");
+
+  const data = new FormData(form);
+  const payload = {
+    nombre: data.get("nombre"),
+    email: data.get("email"),
+    testId: data.get("testId"),
+    answers: []
+  };
+
+  for (const [k, v] of data.entries()) {
+    if (k.startsWith("q") && v) {
+      payload.answers.push({ questionId: k.substring(1), answer: v });
+    }
+  }
+
+  try {
+    const res = await fetch(SUBMIT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) throw new Error();
+
+    resultadoDiv.innerText = "Exam submitted successfully.";
+    resultadoDiv.style.color = "#16a34a";
+
+  } catch {
+    resultadoDiv.innerText = "❌ Error submitting exam. Please contact support.";
+    resultadoDiv.style.color = "#dc2626";
+  }
+});
+
+/* ========= AUTO SUBMIT ========= */
+function autoSubmit() {
+  form.requestSubmit();
+}
 </script>
 
 </body>
