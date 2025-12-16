@@ -1,4 +1,3 @@
-´´
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -27,16 +26,11 @@
       padding: 35px;
     }
 
-    .question { margin-bottom: 26px; }
-
-    .calc-wrapper {
-      display: flex;
-      gap: 12px;
-      margin-top: 6px;
+    h1, h2 {
+      text-align: center;
+      margin-top: 0;
+      color: #0f172a;
     }
-
-    .calc-value { flex: 2; }
-    .calc-unit { flex: 1; }
 
     input, textarea {
       width: 100%;
@@ -47,6 +41,19 @@
       border: 1px solid #cbd5e1;
       box-sizing: border-box;
     }
+
+    input[type="radio"] { width: auto !important; margin: 0; }
+
+    .question { margin-bottom: 26px; }
+
+    .calc-wrapper {
+      display: flex;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .calc-value { flex: 2; }
+    .calc-unit { flex: 1; }
 
     button {
       background: #2563eb;
@@ -74,7 +81,6 @@
     <h1>DRILLING TEST</h1>
 
     <form id="examForm">
-
       <label>Name</label>
       <input type="text" name="nombre" required>
 
@@ -113,10 +119,9 @@ function loadQuestions() {
 
         if (p.tipo === "multiple option") {
           ["A","B","C","D"].forEach(o => {
-            html += `
-              <label>
-                <input type="radio" name="q${p.id}" value="${o}"> ${o}) ${p["opcion"+o]}
-              </label><br>`;
+            html += `<label>
+              <input type="radio" name="q${p.id}" value="${o}"> ${o}) ${p["opcion"+o]}
+            </label><br>`;
           });
         }
 
@@ -134,7 +139,7 @@ function loadQuestions() {
           html += `
             <div class="calc-wrapper">
               <input type="number" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})">
-              <input type="text" class="calc-unit" placeholder="Units (lbs)" oninput="updateCalc(${p.id})">
+              <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})">
               <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
             </div>`;
         }
@@ -145,30 +150,11 @@ function loadQuestions() {
     });
 }
 
-/* ========= CALC HANDLER ========= */
-function updateCalc(id) {
-  const hidden = document.getElementById(`calc-q${id}`);
-  const wrapper = hidden.closest(".calc-wrapper");
-
-  const value = wrapper.querySelector(".calc-value").value;
-  const unit = wrapper.querySelector(".calc-unit").value;
-
-  if (value || unit) {
-    hidden.value = JSON.stringify({
-      value: Number(value),
-      unit: unit
-    });
-  } else {
-    hidden.value = "";
-  }
-}
-
 /* ========= SUBMIT ========= */
 form.addEventListener("submit", async e => {
   e.preventDefault();
 
   const data = new FormData(form);
-
   const payload = {
     nombre: data.get("nombre"),
     email: data.get("email"),
@@ -178,10 +164,7 @@ form.addEventListener("submit", async e => {
 
   for (const [k, v] of data.entries()) {
     if (k.startsWith("q") && v) {
-      payload.answers.push({
-        questionId: k.substring(1),
-        answer: v
-      });
+      payload.answers.push({ questionId: k.substring(1), answer: v });
     }
   }
 
@@ -192,12 +175,28 @@ form.addEventListener("submit", async e => {
       body: JSON.stringify(payload)
     });
 
-    resultadoDiv.innerText = "✅ Exam submitted successfully";
+    resultadoDiv.innerText = "Exam submitted successfully.";
 
   } catch {
-    resultadoDiv.innerText = "❌ Error submitting exam";
+    resultadoDiv.innerText = "❌ Error submitting exam.";
   }
 });
+
+/* ========= FIX CÁLCULO (ÚNICO AGREGADO) ========= */
+function updateCalc(id) {
+  const hidden = document.getElementById(`calc-q${id}`);
+  if (!hidden) return;
+
+  const wrapper = hidden.parentElement;
+  const value = wrapper.querySelector(".calc-value")?.value || "";
+  const unit = wrapper.querySelector(".calc-unit")?.value || "";
+
+  if (value || unit) {
+    hidden.value = `${value} ${unit}`.trim();
+  } else {
+    hidden.value = "";
+  }
+}
 
 /* INIT */
 loadQuestions();
