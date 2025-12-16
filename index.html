@@ -53,7 +53,6 @@
       box-sizing: border-box;
     }
 
-    input[type="radio"] { width: auto !important; margin: 0; }
     textarea { resize: vertical; }
 
     button {
@@ -62,7 +61,6 @@
       border: none;
       border-radius: 6px;
       padding: 8px 16px;
-      font-size: 14px;
       cursor: pointer;
       margin-top: 15px;
     }
@@ -76,7 +74,17 @@
     .hidden { display: none; }
     .error { color: #dc2626; text-align: center; }
 
-    .question { margin-bottom: 26px; }
+    .question {
+      margin-bottom: 30px;
+    }
+
+    .question img {
+      max-width: 100%;
+      display: block;
+      margin: 12px auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
 
     .option-row {
       display: flex;
@@ -85,21 +93,11 @@
       margin: 6px 0;
     }
 
-    .audio-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 6px;
-      margin-bottom: 6px;
-    }
-
     .calc-wrapper {
       display: flex;
       gap: 12px;
       margin-top: 6px;
     }
-
-    .calc-value { flex: 2; }
-    .calc-unit { flex: 1; }
 
     .submit-btn {
       width: 100%;
@@ -111,18 +109,6 @@
 
 <body>
 
-<!-- LOGIN -->
-<div class="container" id="loginScreen">
-  <div class="card">
-    <h2>Student Login</h2>
-    <input type="text" id="loginUser" placeholder="Student ID">
-    <input type="password" id="loginPass" placeholder="Password">
-    <button type="button" onclick="login()">Login</button>
-    <div id="loginError" class="error"></div>
-  </div>
-</div>
-
-<!-- EXAM -->
 <div class="container hidden" id="examScreen">
   <div id="timer">30:00</div>
 
@@ -131,10 +117,10 @@
 
     <form id="examForm">
       <label>Name</label>
-      <input type="text" name="nombre" id="studentName" required>
+      <input type="text" name="nombre" required>
 
       <label>Email</label>
-      <input type="email" name="email" id="studentEmail" required>
+      <input type="email" name="email" required>
 
       <input type="hidden" name="testId" value="1">
 
@@ -148,16 +134,8 @@
 </div>
 
 <script>
-/* ========= CONFIG ========= */
 const USE_TEST = true;
-const EXAM_DURATION = 30 * 60;
-const AUTOSAVE_INTERVAL = 30 * 1000;
 
-const LOGIN_URL = USE_TEST
-  ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
-  : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
-
-/* ✅ SOLO CAMBIO AQUÍ */
 const SUBMIT_URL = USE_TEST
   ? "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission-v2"
   : "https://gilloli.app.n8n.cloud/webhook/student-exam-submission-v2";
@@ -165,100 +143,10 @@ const SUBMIT_URL = USE_TEST
 const questionsUrl =
   "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
 
-/* ========= STATE ========= */
-let timeLeft = EXAM_DURATION;
-let timerInterval, autosaveInterval;
-let mediaRecorder;
-let audioChunks = {};
-
 const form = document.getElementById("examForm");
-const timerEl = document.getElementById("timer");
 const resultadoDiv = document.getElementById("resultado");
 
-/* ========= LOGIN ========= */
-async function login() {
-  loginError.innerText = "";
-  try {
-    const res = await fetch(LOGIN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user: loginUser.value.trim(),
-        pass: loginPass.value.trim()
-      })
-    });
-
-    const data = await res.json();
-    if (!data.success) throw new Error();
-
-    studentName.value = data.student?.name || "";
-    studentEmail.value = data.student?.email || "";
-
-    loginScreen.classList.add("hidden");
-    examScreen.classList.remove("hidden");
-
-    loadQuestions();
-    startTimer();
-    startAutosave();
-    restoreAutosave();
-
-  } catch {
-    loginError.innerText = "Invalid username or password";
-  }
-}
-
-/* ========= TIMER ========= */
-function startTimer() {
-  updateTimer();
-  timerInterval = setInterval(() => {
-    timeLeft--;
-    updateTimer();
-    if (timeLeft <= 0) autoSubmit();
-  }, 1000);
-}
-
-function updateTimer() {
-  const m = String(Math.floor(timeLeft / 60)).padStart(2, "0");
-  const s = String(timeLeft % 60).padStart(2, "0");
-  timerEl.textContent = `${m}:${s}`;
-  if (timeLeft <= 300) timerEl.className = "danger";
-  else if (timeLeft <= 600) timerEl.className = "warning";
-}
-
-/* ========= AUTOSAVE ========= */
-function startAutosave() {
-  autosaveInterval = setInterval(saveProgress, AUTOSAVE_INTERVAL);
-}
-
-function saveProgress() {
-  const data = {};
-  new FormData(form).forEach((v, k) => data[k] = v);
-  localStorage.setItem("exam_autosave", JSON.stringify(data));
-}
-
-function restoreAutosave() {
-  const saved = localStorage.getItem("exam_autosave");
-  if (!saved) return;
-  const data = JSON.parse(saved);
-
-  Object.keys(data).forEach(k => {
-    const el = form.elements[k];
-    if (!el) return;
-    if (el.type === "radio") {
-      document.querySelector(`input[name="${k}"][value="${data[k]}"]`)?.click();
-    } else {
-      el.value = data[k];
-    }
-  });
-}
-
-window.addEventListener("beforeunload", e => {
-  saveProgress();
-  e.preventDefault();
-  e.returnValue = "";
-});
-
-/* ========= QUESTIONS ========= */
+/* ========= QUESTIONS (CON IMÁGENES) ========= */
 function loadQuestions() {
   fetch(questionsUrl)
     .then(res => res.json())
@@ -267,28 +155,48 @@ function loadQuestions() {
       container.innerHTML = "";
 
       preguntas.forEach(p => {
-        let html = `<div class="question"><strong>${p.id}. ${p.pregunta}</strong>`;
+        let html = `<div class="question">
+          <strong>${p.id}. ${p.pregunta}</strong>`;
+
+        /* 🖼️ IMAGEN (SI EXISTE) */
+        const img =
+          p.imagen || p.image || p.img || p.imgUrl || p.imageUrl;
+
+        if (img) {
+          html += `<img src="${img}" alt="Question image">`;
+        }
 
         if (p.tipo === "multiple option") {
           ["A","B","C","D"].forEach(o => {
-            html += `<label class="option-row">
-              <input type="radio" name="q${p.id}" value="${o}"> ${o}) ${p["opcion"+o]}
-            </label>`;
+            html += `
+              <label class="option-row">
+                <input type="radio" name="q${p.id}" value="${o}">
+                ${o}) ${p["opcion"+o]}
+              </label>`;
           });
         }
 
         if (p.tipo === "open-ended") {
+          html += `<textarea name="q${p.id}" placeholder="Write your answer"></textarea>`;
+        }
+
+        if (p.tipo === "calculation") {
           html += `
-            <textarea name="q${p.id}"></textarea>
-            <input type="hidden" name="q${p.id}_audio">
-          `;
+            <div class="calc-wrapper">
+              <input type="number" placeholder="Value">
+              <input type="text" placeholder="Units">
+              <input type="hidden" name="q${p.id}">
+            </div>`;
         }
 
         if (p.tipo === "true/false") {
           html += `
-            <label class="option-row"><input type="radio" name="q${p.id}" value="true"> True</label>
-            <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>
-          `;
+            <label class="option-row">
+              <input type="radio" name="q${p.id}" value="true"> True
+            </label>
+            <label class="option-row">
+              <input type="radio" name="q${p.id}" value="false"> False
+            </label>`;
         }
 
         html += "</div>";
@@ -297,16 +205,11 @@ function loadQuestions() {
     });
 }
 
+loadQuestions();
+
 /* ========= SUBMIT ========= */
 form.addEventListener("submit", async e => {
   e.preventDefault();
-
-  resultadoDiv.innerText = "Submitting exam...";
-  resultadoDiv.style.color = "#1f2937";
-
-  clearInterval(timerInterval);
-  clearInterval(autosaveInterval);
-  localStorage.removeItem("exam_autosave");
 
   const data = new FormData(form);
   const payload = {
@@ -326,13 +229,11 @@ form.addEventListener("submit", async e => {
   }
 
   try {
-    const res = await fetch(SUBMIT_URL, {
+    await fetch(SUBMIT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-
-    if (!res.ok) throw new Error();
 
     resultadoDiv.innerText = "Exam submitted successfully.";
     resultadoDiv.style.color = "#16a34a";
@@ -342,10 +243,6 @@ form.addEventListener("submit", async e => {
     resultadoDiv.style.color = "#dc2626";
   }
 });
-
-function autoSubmit() {
-  form.requestSubmit();
-}
 </script>
 
 </body>
