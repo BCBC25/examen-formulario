@@ -343,11 +343,12 @@ function clearAudio(id) {
   document.querySelector(`input[name="q${id}_audio"]`).value = "";
 }
 
-/* ========= SUBMIT ========= */
-form.addEventListener("submit", async e => {
+/* ========= SUBMIT (FORM POST REAL) ========= */
+form.addEventListener("submit", e => {
   e.preventDefault();
 
   isSubmitting = true;
+
   resultadoDiv.innerText = "Submitting exam...";
   resultadoDiv.style.color = "#1f2937";
 
@@ -369,22 +370,22 @@ form.addEventListener("submit", async e => {
     }
   }
 
-  try {
-    await fetch(SUBMIT_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+  const postForm = document.createElement("form");
+  postForm.method = "POST";
+  postForm.action = SUBMIT_URL;
+  postForm.style.display = "none";
 
-    resultadoDiv.innerText = "Exam submitted successfully.";
-    resultadoDiv.style.color = "#16a34a";
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = "data";
+  input.value = JSON.stringify(payload);
 
-  } catch {
-    isSubmitting = false;
-    resultadoDiv.innerText = "❌ Error submitting exam. Please contact support.";
-    resultadoDiv.style.color = "#dc2626";
-  }
+  postForm.appendChild(input);
+  document.body.appendChild(postForm);
+  postForm.submit();
+
+  resultadoDiv.innerText = "Exam submitted successfully.";
+  resultadoDiv.style.color = "#16a34a";
 });
 
 /* ========= AUTO SUBMIT ========= */
