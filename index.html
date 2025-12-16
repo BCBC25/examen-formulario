@@ -1,3 +1,4 @@
+´´´
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -39,6 +40,9 @@
       font-weight: 600;
       color: #2563eb;
     }
+
+    #timer.warning { color: #d97706; }
+    #timer.danger { color: #dc2626; }
 
     input, textarea {
       width: 100%;
@@ -108,6 +112,18 @@
 
 <body>
 
+<!-- LOGIN -->
+<div class="container" id="loginScreen">
+  <div class="card">
+    <h2>Student Login</h2>
+    <input type="text" id="loginUser" placeholder="Student ID">
+    <input type="password" id="loginPass" placeholder="Password">
+    <button type="button" onclick="login()">Login</button>
+    <div id="loginError" class="error"></div>
+  </div>
+</div>
+
+<!-- EXAM -->
 <div class="container hidden" id="examScreen">
   <div id="timer">30:00</div>
 
@@ -123,7 +139,7 @@
 
       <input type="hidden" name="testId" value="1">
 
-      <div id="preguntas"></div>
+      <div id="preguntas">Loading questions...</div>
 
       <button type="submit" class="submit-btn">Submit Exam</button>
     </form>
@@ -133,13 +149,112 @@
 </div>
 
 <script>
+/* ========= CONFIG ========= */
+const USE_TEST = true;
+const EXAM_DURATION = 30 * 60;
+const AUTOSAVE_INTERVAL = 30 * 1000;
+
+const LOGIN_URL = USE_TEST
+  ? "https://gilloli.app.n8n.cloud/webhook-test/login-webhook"
+  : "https://gilloli.app.n8n.cloud/webhook/login-webhook";
+
+/* ✅ WEBHOOK NUEVO v2 */
+const SUBMIT_URL = USE_TEST
+  ? "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission-v2"
+  : "https://gilloli.app.n8n.cloud/webhook/student-exam-submission-v2";
+
 const questionsUrl = "https://script.google.com/macros/s/AKfycbwOJdDrp_XNfIQPv6mph0IhzI7W9JGZFhqErWC5YJE-UfkETADJNkB0IfYJCiEp4_pxcg/exec";
-const SUBMIT_URL = "https://gilloli.app.n8n.cloud/webhook-test/student-exam-submission-v2";
+
+/* ========= STATE ========= */
+let timeLeft = EXAM_DURATION;
+let timerInterval, autosaveInterval;
+let mediaRecorder;
+let audioChunks = {};
 
 const form = document.getElementById("examForm");
+const timerEl = document.getElementById("timer");
 const resultadoDiv = document.getElementById("resultado");
 
-/* ===== LOAD QUESTIONS (ORIGINAL + CALCULATION) ===== */
+/* ========= LOGIN ========= */
+async function login() {
+  loginError.innerText = "";
+
+  try {
+    const res = await fetch(LOGIN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user: loginUser.value.trim(),
+        pass: loginPass.value.trim()
+      })
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error();
+
+    studentName.value = data.student?.name || "";
+    studentEmail.value = data.student?.email || "";
+
+    loginScreen.classList.add("hidden");
+    examScreen.classList.remove("hidden");
+
+    loadQuestions();
+    startTimer();
+    startAutosave();
+    restoreAutosave();
+
+  } catch {
+    loginError.innerText = "Invalid username or password";
+  }
+}
+
+/* ========= TIMER ========= */
+function startTimer() {
+  updateTimer();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimer();
+    if (timeLeft <= 0) autoSubmit();
+  }, 1000);
+}
+
+function updateTimer() {
+  const m = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+  const s = String(timeLeft % 60).padStart(2, "0");
+  timerEl.textContent = `${m}:${s}`;
+  if (timeLeft <= 300) timerEl.className = "danger";
+  else if (timeLeft <= 600) timerEl.className = "warning";
+}
+
+/* ========= AUTOSAVE ========= */
+function startAutosave() {
+  autosaveInterval = setInterval(saveProgress, AUTOSAVE_INTERVAL);
+}
+
+function saveProgress() {
+  const data = {};
+  new FormData(form).forEach((v, k) => data[k] = v);
+  localStorage.setItem("exam_autosave", JSON.stringify(data));
+}
+
+function restoreAutosave() {
+  const saved = localStorage.getItem("exam_autosave");
+  if (!saved) return;
+  const data = JSON.parse(saved);
+
+  Object.keys(data).forEach(k => {
+    const el = form.elements[k];
+    if (!el) return;
+
+    if (el.type === "radio") {
+      document.querySelector(`input[name="${k}"][value="${data[k]}"]`)?.click();
+    } else {
+      el.value = data[k];
+    }
+  });
+}
+
+/* ========= QUESTIONS ========= */
 function loadQuestions() {
   fetch(questionsUrl)
     .then(res => res.json())
@@ -159,7 +274,23 @@ function loadQuestions() {
         }
 
         if (p.tipo === "open-ended") {
-          html += `<textarea name="q${p.id}"></textarea>`;
+          html += `
+            <textarea name="q${p.id}" placeholder="Write your answer or record audio"></textarea>
+            <div class="audio-actions">
+              <button type="button" onclick="toggleRecording(${p.id})">🎤 Record</button>
+              <button type="button" class="secondary-btn" onclick="clearAudio(${p.id})">🗑 Clear audio</button>
+            </div>
+            <input type="hidden" name="q${p.id}_audio">
+          `;
+        }
+
+        if (p.tipo === "calculation") {
+          html += `
+            <div class="calc-wrapper">
+              <input type="number" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})">
+              <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})">
+              <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
+            </div>`;
         }
 
         if (p.tipo === "true/false") {
@@ -168,37 +299,20 @@ function loadQuestions() {
             <label class="option-row"><input type="radio" name="q${p.id}" value="false"> False</label>`;
         }
 
-        /* ✅ CALCULATION (ÚNICA ADICIÓN) */
-        if (p.tipo === "calculation") {
-          html += `
-            <div class="calc-wrapper">
-              <input type="number" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})">
-              <input type="text" class="calc-unit" placeholder="Units" oninput="updateCalc(${p.id})">
-              <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
-            </div>`;
-        }
-
         html += "</div>";
         container.insertAdjacentHTML("beforeend", html);
       });
     });
 }
 
-/* ===== NUEVA FUNCIÓN PARA CÁLCULO ===== */
-function updateCalc(id) {
-  const hidden = document.getElementById(`calc-q${id}`);
-  if (!hidden) return;
-
-  const wrapper = hidden.parentElement;
-  const value = wrapper.querySelector(".calc-value")?.value.trim();
-  const unit = wrapper.querySelector(".calc-unit")?.value.trim();
-
-  hidden.value = value ? (unit ? `${value} ${unit}` : value) : "";
-}
-
-/* ===== SUBMIT ===== */
+/* ========= SUBMIT ========= */
 form.addEventListener("submit", async e => {
   e.preventDefault();
+
+  resultadoDiv.innerText = "Submitting exam...";
+  clearInterval(timerInterval);
+  clearInterval(autosaveInterval);
+  localStorage.removeItem("exam_autosave");
 
   const data = new FormData(form);
   const payload = {
@@ -214,17 +328,41 @@ form.addEventListener("submit", async e => {
     }
   }
 
-  await fetch(SUBMIT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
+  try {
+    await fetch(SUBMIT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-  resultadoDiv.innerText = "Exam submitted successfully";
+    resultadoDiv.innerText = "Exam submitted successfully.";
+    resultadoDiv.style.color = "#16a34a";
+
+  } catch {
+    resultadoDiv.innerText = "❌ Error submitting exam.";
+    resultadoDiv.style.color = "#dc2626";
+  }
 });
 
-loadQuestions();
+function autoSubmit() {
+  form.requestSubmit();
+}
 </script>
 
 </body>
 </html>
+<script>
+/* ========= FIX PARA PREGUNTAS DE CÁLCULO ========= */
+function updateCalc(id) {
+  const hiddenInput = document.getElementById(`calc-q${id}`);
+  if (!hiddenInput) return;
+
+  const wrapper = hiddenInput.parentElement;
+  const value = wrapper.querySelector(".calc-value")?.value.trim();
+  const unit = wrapper.querySelector(".calc-unit")?.value.trim();
+
+  hiddenInput.value = value
+    ? (unit ? `${value} ${unit}` : value)
+    : "";
+}
+</script>
