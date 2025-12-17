@@ -356,11 +356,13 @@ let mediaRecorders = {};
 let audioStreams = {};
 
 async function toggleRecording(id) {
+  const btn = event.currentTarget;
 
   // Si ya está grabando → detener
   if (mediaRecorders[id]?.state === "recording") {
     mediaRecorders[id].stop();
     audioStreams[id].getTracks().forEach(t => t.stop());
+    btn.textContent = "🎤 Record";
     return;
   }
 
@@ -380,7 +382,7 @@ async function toggleRecording(id) {
       const blob = new Blob(audioChunks[id], { type: "audio/webm" });
       const audioURL = URL.createObjectURL(blob);
 
-      // Guardar base64 en input hidden
+      // Guardar base64
       const reader = new FileReader();
       reader.onloadend = () => {
         const hiddenInput = document.querySelector(
@@ -404,7 +406,7 @@ async function toggleRecording(id) {
     };
 
     recorder.start();
-    alert("🎙 Grabando... presiona nuevamente para detener");
+    btn.textContent = "⏹ Stop";
 
   } catch (err) {
     alert("❌ No se pudo acceder al micrófono");
@@ -421,6 +423,7 @@ function clearAudio(id) {
   if (audio) audio.remove();
 }
 </script>
+
 
 </body>
 </html>
