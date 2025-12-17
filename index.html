@@ -351,58 +351,73 @@ function autoSubmit() {
 <script>
 /* ========= AUDIO RECORDING FIX ========= */
 
+let mediaRecorders = {};
+let audioStreams = {};
+
 async function toggleRecording(id) {
-  // If already recording → stop
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    mediaRecorder.stop();
+
+  // Si ya está grabando → detener
+  if (mediaRecorders[id]?.state === "recording") {
+    mediaRecorders[id].stop();
+    audioStreams[id].getTracks().forEach(t => t.stop());
     return;
   }
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioStreams[id] = stream;
     audioChunks[id] = [];
 
-    mediaRecorder = new MediaRecorder(stream);
+    const recorder = new MediaRecorder(stream);
+    mediaRecorders[id] = recorder;
 
-    mediaRecorder.ondataavailable = e => {
-      if (e.data.size > 0) {
-        audioChunks[id].push(e.data);
-      }
+    recorder.ondataavailable = e => {
+      if (e.data.size > 0) audioChunks[id].push(e.data);
     };
 
-    mediaRecorder.onstop = () => {
+    recorder.onstop = () => {
       const blob = new Blob(audioChunks[id], { type: "audio/webm" });
-      const reader = new FileReader();
+      const audioURL = URL.createObjectURL(blob);
 
+      // Guardar base64 en input hidden
+      const reader = new FileReader();
       reader.onloadend = () => {
-        const base64Audio = reader.result;
         const hiddenInput = document.querySelector(
           `input[name="q${id}_audio"]`
         );
-
-        if (hiddenInput) {
-          hiddenInput.value = base64Audio;
-        }
+        if (hiddenInput) hiddenInput.value = reader.result;
       };
-
       reader.readAsDataURL(blob);
+
+      // Crear / actualizar reproductor
+      let audio = document.getElementById(`audio-q${id}`);
+      if (!audio) {
+        audio = document.createElement("audio");
+        audio.id = `audio-q${id}`;
+        audio.controls = true;
+        document
+          .querySelector(`input[name="q${id}_audio"]`)
+          .insertAdjacentElement("afterend", audio);
+      }
+      audio.src = audioURL;
     };
 
-    mediaRecorder.start();
-    alert("🎙 Recording started. Click again to stop.");
+    recorder.start();
+    alert("🎙 Grabando... presiona nuevamente para detener");
 
   } catch (err) {
-    alert("Microphone access denied or not available.");
+    alert("❌ No se pudo acceder al micrófono");
     console.error(err);
   }
 }
 
 function clearAudio(id) {
   audioChunks[id] = [];
-  const hiddenInput = document.querySelector(
-    `input[name="q${id}_audio"]`
-  );
+  const hiddenInput = document.querySelector(`input[name="q${id}_audio"]`);
   if (hiddenInput) hiddenInput.value = "";
+
+  const audio = document.getElementById(`audio-q${id}`);
+  if (audio) audio.remove();
 }
 </script>
 
