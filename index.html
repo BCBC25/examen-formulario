@@ -286,7 +286,7 @@ function loadQuestions() {
         if (p.tipo === "calculation") {
           html += `
             <div class="calc-wrapper">
-              <input type="number" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})">
+              <input type="number" step="any" class="calc-value" placeholder="Value" oninput="updateCalc(${p.id})">
               <input type="text" class="calc-unit" placeholder="Units (e.g. lbs)" oninput="updateCalc(${p.id})">
               <input type="hidden" name="q${p.id}" id="calc-q${p.id}">
             </div>`;
