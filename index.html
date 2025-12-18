@@ -433,7 +433,10 @@ function updateCalc(id) {
   if (!hiddenInput) return;
 
   const wrapper = hiddenInput.parentElement;
-  const value = wrapper.querySelector(".calc-value")?.value.trim();
+  const value = wrapper
+  .querySelector(".calc-value")
+  ?.value.trim()
+  .replace(",", ".");
   const unit = wrapper.querySelector(".calc-unit")?.value.trim();
 
   hiddenInput.value = value
